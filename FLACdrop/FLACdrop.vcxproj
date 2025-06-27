@@ -81,6 +81,9 @@
       <AdditionalDependencies>FLAC.lib;libmp3lame.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)libFLAC\lib\$(Platform)\$(Configuration)\;$(SolutionDir)libmp3lame\lib\$(Platform)\$(Configuration)\</AdditionalLibraryDirectories>
     </Link>
+    <ProjectReference>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
+    </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="FLACdrop.ico" />

@@ -40,7 +40,6 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	UNREFERENCED_PARAMETER(lParam);
 
-	//HWND hDlgText = GetDlgItem(hDlg, IDC_MESSAGES);
 	HWND hDlgFLACQuality = GetDlgItem(hDlg, IDC_FLAC_QUALITY);
 	HWND hDlgFLACQualityView = GetDlgItem(hDlg, IDC_VIEW_FLAC_QUALITY);
 	HWND hDlgFLACVerify = GetDlgItem(hDlg, IDC_FLAC_VERIFY);
@@ -52,7 +51,9 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	HWND hDlgMP3VBRQualityView = GetDlgItem(hDlg, IDC_VIEW_MP3_VBR_QUALITY);
 	HWND hDlgThreads = GetDlgItem(hDlg, IDC_THREADS);
 	HWND hDlgThreadsView = GetDlgItem(hDlg, IDC_VIEW_THREADS_NUMBER);
-	TCHAR A[16];
+	HWND hDlgStaticMaxThreads = GetDlgItem(hDlg, IDC_STATICMAXTHREAD);
+
+	TCHAR AA[16];
 	LRESULT result;
 
 	switch (message)
@@ -61,8 +62,8 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			// Setup FLAC encoding quality slider and number view
 			SendMessage(hDlgFLACQuality, TBM_SETRANGE, false, MAKELONG(1, 8));
 			SendMessage(hDlgFLACQuality, TBM_SETPOS, true, EncSettings.FLAC_EncodingQuality);
-			_itow_s(EncSettings.FLAC_EncodingQuality, A, sizeof(A));
-			SendMessage(hDlgFLACQualityView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(EncSettings.FLAC_EncodingQuality, AA, sizeof(AA) / sizeof (TCHAR), 10);
+			SendMessage(hDlgFLACQualityView, WM_SETTEXT, NULL, (LPARAM)AA);
 			
 			// Setup FLAC verify checkbox
 			if(EncSettings.FLAC_Verify == true) SendMessage(hDlgFLACVerify, BM_SETCHECK, BST_CHECKED, 0);
@@ -75,23 +76,23 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			// Setup LAME internal encoding quality slider and number view
 			SendMessage(hDlgMP3InternalQuality, TBM_SETRANGE, false, MAKELONG(0, 9));
 			SendMessage(hDlgMP3InternalQuality, TBM_SETPOS, true, EncSettings.LAME_InternalEncodingQuality);
-			_itow_s(EncSettings.LAME_InternalEncodingQuality, A, sizeof(A));
-			SendMessage(hDlgMP3InternalQualityView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(EncSettings.LAME_InternalEncodingQuality, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgMP3InternalQualityView, WM_SETTEXT, NULL, (LPARAM)AA);
 
 			// Setup LAME VBR quality slider and number view
 			SendMessage(hDlgMP3VBRQuality, TBM_SETRANGE, false, MAKELONG(0, 9));
 			SendMessage(hDlgMP3VBRQuality, TBM_SETPOS, true, EncSettings.LAME_VBRQuality);
-			_itow_s(EncSettings.LAME_VBRQuality, A, sizeof(A));
-			SendMessage(hDlgMP3VBRQualityView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(EncSettings.LAME_VBRQuality, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgMP3VBRQualityView, WM_SETTEXT, NULL, (LPARAM)AA);
 
 			// Fill up LAME combobox CBR bitrates
-			memset(&A, 0, sizeof(A));
+			memset(&AA, 0, sizeof(AA));
 			for (int i = 0; i <= LAME_CBRBITRATES_QUANTITY; i++)
 			{
-				wcscpy_s(A, sizeof(A) / sizeof(TCHAR), (TCHAR*)LAME_CBRBITRATES_TEXT[i]);
+				wcscpy_s(AA, sizeof(AA) / sizeof(TCHAR), (TCHAR*)LAME_CBRBITRATES_TEXT[i]);
 
 				// Add string to combobox
-				SendMessage(hDlgMP3CBRBitrate, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)A);
+				SendMessage(hDlgMP3CBRBitrate, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)AA);
 			}
 			// Send the CB_SETCURSEL message to display an initial item in the selection field
 			SendMessage(hDlgMP3CBRBitrate, CB_SETCURSEL, (WPARAM)EncSettings.LAME_CBRBitrate, (LPARAM)0);
@@ -110,8 +111,10 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			// Setup thread number slider and number view
 			SendMessage(hDlgThreads, TBM_SETRANGE, false, MAKELONG(1, MAX_THREADS));
 			SendMessage(hDlgThreads, TBM_SETPOS, true, EncSettings.OUT_Threads);
-			_itow_s(EncSettings.OUT_Threads, A, sizeof(A));
-			SendMessage(hDlgThreadsView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(EncSettings.OUT_Threads, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgThreadsView, WM_SETTEXT, NULL, (LPARAM)AA);
+			_itow_s(MAX_THREADS, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgStaticMaxThreads, WM_SETTEXT, NULL, (LPARAM)AA);
 			return (INT_PTR)TRUE;
 
 		case WM_COMMAND:
@@ -136,9 +139,6 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					if (IsDlgButtonChecked(hDlg, IDC_CBR) == BST_CHECKED) EncSettings.LAME_EncodingMode = 0;
 					if (IsDlgButtonChecked(hDlg, IDC_VBR) == BST_CHECKED) EncSettings.LAME_EncodingMode = 1;
 
-					//result = RegOut();
-					//if (result!= 0) SendMessage(hDlgText, WM_SETTEXT, 0, (LPARAM)ErrMessage[result]);
-
 					EndDialog(hDlg, LOWORD(wParam));
 					return (INT_PTR)TRUE;
 			}
@@ -147,20 +147,21 @@ INT_PTR CALLBACK Settings(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_HSCROLL:
 			// one of the sliders got moved so we get the slider control positions and write the positions on the screen
 			result = SendMessage(hDlgFLACQuality, TBM_GETPOS, 0, 0);
-			_itow_s(result, A, sizeof(A));
-			SendMessage(hDlgFLACQualityView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(result, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgFLACQualityView, WM_SETTEXT, NULL, (LPARAM)AA);
 			
 			result = SendMessage(hDlgMP3InternalQuality, TBM_GETPOS, 0, 0);
-			_itow_s(result, A, sizeof(A));
-			SendMessage(hDlgMP3InternalQualityView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(result, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgMP3InternalQualityView, WM_SETTEXT, NULL, (LPARAM)AA);
 			
 			result = SendMessage(hDlgMP3VBRQuality, TBM_GETPOS, 0, 0);
-			_itow_s(result, A, sizeof(A));
-			SendMessage(hDlgMP3VBRQualityView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(result, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgMP3VBRQualityView, WM_SETTEXT, NULL, (LPARAM)AA);
 			
 			result = SendMessage(hDlgThreads, TBM_GETPOS, 0, 0);
-			_itow_s(result, A, sizeof(A));
-			SendMessage(hDlgThreadsView, WM_SETTEXT, NULL, (LPARAM)A);
+			_itow_s(result, AA, sizeof(AA) / sizeof(TCHAR), 10);
+			SendMessage(hDlgThreadsView, WM_SETTEXT, NULL, (LPARAM)AA);
+			
 			return (INT_PTR)TRUE;
 	}
 	return (INT_PTR)FALSE;

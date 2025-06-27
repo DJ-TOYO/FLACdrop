@@ -48,7 +48,7 @@
 #define LAME_ENCTYPE 0				// 0: CBR; 1: VBR
 #define OUT_TYPE 0					// according to the "OUT_TYPE_*" definitions
 #define OUT_THREADS 1				// current number of batch processing threads
-#define MAX_THREADS 8				// maximum number of batch processing threads
+#define MAX_THREADS 16				// maximum number of batch processing threads
 
 //WAVE file audio formats
 // http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/WAVE.html

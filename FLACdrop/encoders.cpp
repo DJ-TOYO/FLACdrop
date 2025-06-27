@@ -382,38 +382,38 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID *params)
 		buffer_wav = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
 		buffer_mp3 = new BYTE[LAME_MAXMP3BUFFER];
 
-		/*size_t  id3v2_size;
-		unsigned char *id3v2tag;
+//		size_t  id3v2_size;
+//		unsigned char *id3v2tag;
 
-		id3v2_size = lame_get_id3v2_tag(lame_gfp, 0, 0);
-		if (id3v2_size > 0)
-		{
-			id3v2tag = new unsigned char[id3v2_size];
-			if (id3v2tag != 0)
-			{
-				imp3 = lame_get_id3v2_tag(lame_gfp, id3v2tag, id3v2_size);
-				owrite = (int) fwrite(id3v2tag, 1, imp3, fout);
-				delete []id3v2tag;
-				if (owrite != imp3) return FAIL_LAME_ID3TAG;
-			}
-		}
-		else
-		{
-			unsigned char* id3v2tag = getOldTag(gf);
-			id3v2_size = sizeOfOldTag(gf);
-			if ( id3v2_size > 0 )
-			{
-				size_t owrite = fwrite(id3v2tag, 1, id3v2_size, fout);
-				if (owrite != id3v2_size) return FAIL_LAME_ID3TAG;
-			}
-		}
-		if (LAME_FLUSH == true) fflush(fout);*/
+//		id3v2_size = lame_get_id3v2_tag(lame_gfp, 0, 0);
+//		if (id3v2_size > 0)
+//		{
+//			id3v2tag = new unsigned char[id3v2_size];
+//			if (id3v2tag != 0)
+//			{
+//				imp3 = lame_get_id3v2_tag(lame_gfp, id3v2tag, id3v2_size);
+//				owrite = (int) fwrite(id3v2tag, 1, imp3, fout);
+//				delete []id3v2tag;
+//				if (owrite != imp3) return FAIL_LAME_ID3TAG;
+//			}
+//		}
+//		else
+//		{
+//			unsigned char* id3v2tag = getOldTag(gf);
+//			id3v2_size = sizeOfOldTag(gf);
+//			if ( id3v2_size > 0 )
+//			{
+//				size_t owrite = fwrite(id3v2tag, 1, id3v2_size, fout);
+//				if (owrite != id3v2_size) return FAIL_LAME_ID3TAG;
+//			}
+//		}
+//		if (LAME_FLUSH == true) fflush(fout);
 
 		left = (size_t)total_samples;
 		// read blocks of samples from WAVE file and feed to the encoder
 		while (ok && left)
 		{
-			need = (left > READSIZE_MP3 ? (size_t)READSIZE_MP3 : (size_t)left);	// calculate the number of samples to read
+			need = (left > READSIZE_MP3 ? (size_t)READSIZE_MP3 : left);	// calculate the number of samples to read
 			if (fread(buffer_wav, (size_t)FMTheader.NumChannels * (FMTheader.BitsPerSample / 8), need, fin) != need)
 			{
 				// error during reading from WAVE file
@@ -428,7 +428,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID *params)
 					imp3 = lame_encode_buffer_interleaved(lame_gfp, (short int*)buffer_wav, need, buffer_mp3, LAME_MAXMP3BUFFER);
 					break;
 				case 1:	// the interleaved version corrupts the mono stream
-					imp3 = lame_encode_buffer(lame_gfp, (short int*)buffer_wav, NULL, need, buffer_mp3, LAME_MAXMP3BUFFER);
+					imp3 = lame_encode_buffer(lame_gfp, (short int*)buffer_wav, nullptr, need, buffer_mp3, LAME_MAXMP3BUFFER);
 					break;
 				}
 
