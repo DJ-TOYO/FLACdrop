@@ -226,6 +226,14 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			UIParameters.progress[5] = GetDlgItem(hDlg, IDC_PROGRESS5);
 			UIParameters.progress[6] = GetDlgItem(hDlg, IDC_PROGRESS6);
 			UIParameters.progress[7] = GetDlgItem(hDlg, IDC_PROGRESS7);
+			UIParameters.progress[8] = GetDlgItem(hDlg, IDC_PROGRESS8);
+			UIParameters.progress[9] = GetDlgItem(hDlg, IDC_PROGRESS9);
+			UIParameters.progress[10] = GetDlgItem(hDlg, IDC_PROGRESS10);
+			UIParameters.progress[11] = GetDlgItem(hDlg, IDC_PROGRESS11);
+			UIParameters.progress[12] = GetDlgItem(hDlg, IDC_PROGRESS12);
+			UIParameters.progress[13] = GetDlgItem(hDlg, IDC_PROGRESS13);
+			UIParameters.progress[14] = GetDlgItem(hDlg, IDC_PROGRESS14);
+			UIParameters.progress[15] = GetDlgItem(hDlg, IDC_PROGRESS15);
 			UIParameters.progresstotal = GetDlgItem(hDlg, IDC_PROGRESSTOTAL);
 			UIParameters.text = GetDlgItem(hDlg, IDC_MESSAGES);
 			SendMessage(UIParameters.text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
