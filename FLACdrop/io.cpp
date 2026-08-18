@@ -71,7 +71,7 @@ int WriteSettings()
 		return FAIL_REGISTRY_WRITE;
 	}
 
-	err = RegSetValueEx(hKey, L"OUT_Type", 0, REG_DWORD, (LPBYTE)&EncSettings.OUT_Type, sizeof(DWORD));
+	err = RegSetValueEx(hKey, L"OUT_Type", 0, REG_DWORD, (LPBYTE)&EncSettings.enOutType, sizeof(DWORD));
 	if (err != ERROR_SUCCESS)
 	{
 		RegCloseKey(hKey);
@@ -195,15 +195,18 @@ int ReadSettings()
 
 	// load output type setting
 	cb = sizeof(DWORD);
-	err = RegQueryValueEx(hKey, L"OUT_Type", 0, &type, (LPBYTE)&EncSettings.OUT_Type, &cb);
+	err = RegQueryValueEx(hKey, L"OUT_Type", 0, &type, (LPBYTE)&EncSettings.enOutType, &cb);
 	if ((err != ERROR_SUCCESS) || (type != REG_DWORD))
 	{
 		// create the registry entry if it is missing or has a different type
-		EncSettings.OUT_Type = OUT_TYPE;
+		EncSettings.enOutType = TYPE_AUTO;
 		RegDeleteValue(hKey, L"OUT_Type");
-		RegSetValueEx(hKey, L"OUT_Type", 0, REG_DWORD, (LPBYTE)&EncSettings.OUT_Type, sizeof(DWORD));
+		RegSetValueEx(hKey, L"OUT_Type", 0, REG_DWORD, (LPBYTE)&EncSettings.enOutType, sizeof(DWORD));
 	}
-	else if (EncSettings.OUT_Type < 0 && EncSettings.OUT_Type > 1) EncSettings.OUT_Type = OUT_TYPE; // check the loaded value
+	else if (EncSettings.enOutType < TYPE_AUTO || EncSettings.enOutType > TYPE_WAV) // check the loaded value
+	{
+		EncSettings.enOutType = TYPE_AUTO;
+	}
 
 	// load thread number setting
 	cb = sizeof(DWORD);

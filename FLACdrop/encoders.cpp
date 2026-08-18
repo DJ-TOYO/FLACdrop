@@ -68,9 +68,9 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 		// Source is WAVE file
 		if (_wcsnicmp(FilenameExt, L".wav", 4) == 0)
 		{			
-			switch (myparams->OUT_Type)
+			switch (myparams->enOutType)
 			{
-				case OUT_TYPE_FLAC:
+				case TYPE_FLAC:
 					tID = SearchFreeThread(EncParams);
 					EncParams[tID].ThreadInUse = true;
 					EncParams[tID].progress = myparams->progress[tID];
@@ -79,12 +79,20 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 					ThreadStarted = true;
 					break;
 
-				case OUT_TYPE_MP3:
+				case TYPE_MP3:
 					tID = SearchFreeThread(EncParams);
 					EncParams[tID].ThreadInUse = true;
 					EncParams[tID].progress = myparams->progress[tID];
 					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
 					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_WAV2MP3, &EncParams[tID], 0, NULL);
+					ThreadStarted = true;
+					break;
+				case TYPE_AUTO:
+					tID = SearchFreeThread(EncParams);
+					EncParams[tID].ThreadInUse = true;
+					EncParams[tID].progress = myparams->progress[tID];
+					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
+					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_WAV2FLAC, &EncParams[tID], 0, NULL);
 					ThreadStarted = true;
 					break;
 			}
@@ -93,9 +101,9 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 		// Source is FLAC file
 		if (_wcsnicmp(FilenameExt, L".flac", 5) == 0)
 		{
-			switch (myparams->OUT_Type)
+			switch (myparams->enOutType)
 			{
-				case OUT_TYPE_WAV:
+				case TYPE_WAV:
 					tID = SearchFreeThread(EncParams);
 					EncParams[tID].ThreadInUse = true;
 					EncParams[tID].progress = myparams->progress[tID];
@@ -104,12 +112,20 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 					ThreadStarted = true;
 					break;
 				
-				case OUT_TYPE_MP3:
+				case TYPE_MP3:
 					tID = SearchFreeThread(EncParams);
 					EncParams[tID].ThreadInUse = true;
 					EncParams[tID].progress = myparams->progress[tID];
 					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
 					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_FLAC2MP3, &EncParams[tID], 0, NULL);
+					ThreadStarted = true;
+					break;
+				case TYPE_AUTO:
+					tID = SearchFreeThread(EncParams);
+					EncParams[tID].ThreadInUse = true;
+					EncParams[tID].progress = myparams->progress[tID];
+					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
+					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_FLAC2WAV, &EncParams[tID], 0, NULL);
 					ThreadStarted = true;
 					break;
 			}

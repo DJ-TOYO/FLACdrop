@@ -242,18 +242,22 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			if (result != 0) SendMessage(UIParameters.text, WM_SETTEXT, 0, (LPARAM)ErrMessage[result]);
 
 			// setup output type radio buttons
-			switch (EncSettings.OUT_Type)
+			switch (EncSettings.enOutType)
 			{
-				case OUT_TYPE_FLAC:
-					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_WAV, IDC_RADIO_OUT_FLAC);
+				case TYPE_FLAC:
+					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_AUTO, IDC_RADIO_OUT_FLAC);
 					break;
 
-				case OUT_TYPE_MP3:
-					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_WAV, IDC_RADIO_OUT_MP3);
+				case TYPE_MP3	:
+					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_AUTO, IDC_RADIO_OUT_MP3);
 					break;
 
-				case OUT_TYPE_WAV:
-					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_WAV, IDC_RADIO_OUT_WAV);
+				case TYPE_WAV	:
+					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_AUTO, IDC_RADIO_OUT_WAV);
+					break;
+
+				case TYPE_AUTO:
+					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_AUTO, IDC_RADIO_OUT_AUTO);
 					break;
 			}
 
@@ -265,7 +269,7 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				UIParameters.EncoderInUse = true;
 				UIParameters.filedrop = (HDROP)wParam;
-				UIParameters.OUT_Type = EncSettings.OUT_Type;
+
 				CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&EncoderScheduler, &UIParameters, 0, NULL);	// start the encoder thread
 			}
 			break;
@@ -275,9 +279,13 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			{
 				// process the changes in the radio buttons
 				case BN_CLICKED:
-					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_FLAC) == BST_CHECKED) EncSettings.OUT_Type = OUT_TYPE_FLAC;
-					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_MP3) == BST_CHECKED) EncSettings.OUT_Type = OUT_TYPE_MP3;
-					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_WAV) == BST_CHECKED) EncSettings.OUT_Type = OUT_TYPE_WAV;
+					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_FLAC) == BST_CHECKED) UIParameters.enOutType = TYPE_FLAC;
+					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_MP3) == BST_CHECKED) UIParameters.enOutType = TYPE_MP3;
+					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_WAV) == BST_CHECKED) UIParameters.enOutType = TYPE_WAV;
+					if (IsDlgButtonChecked(hDlg, IDC_RADIO_OUT_AUTO) == BST_CHECKED) UIParameters.enOutType = TYPE_AUTO;
+
+					EncSettings.enOutType = UIParameters.enOutType;
+
 					break;
 			}
 			break;

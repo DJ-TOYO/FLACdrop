@@ -14,6 +14,20 @@
 #define OUT_TYPE_MP3 1
 #define OUT_TYPE_WAV 2
 
+// selectable output types(UI)
+typedef enum
+{
+	TYPE_AUTO = 0,
+	TYPE_FLAC,
+	TYPE_MP3,
+	TYPE_WAV,
+} ENUM_RADIO_BTN_TYPE;
+
+#define RADIO_BTN_TYPE_FLAC 0
+#define RADIO_BTN_TYPE_MP3 1
+#define RADIO_BTN_TYPE_WAV 2
+#define RADIO_BTN_TYPE_AUTO 3
+
 // positions of the metadata variables in the transfer structure
 #define MD_NUMBER		16			// number of metadata fields
 #define MD_TITLE		0
@@ -46,7 +60,6 @@
 #define LAME_VBRQUALITY 1			// 0..9
 #define LAME_MAXVBRQUALITY 9
 #define LAME_ENCTYPE 0				// 0: CBR; 1: VBR
-#define OUT_TYPE 0					// according to the "OUT_TYPE_*" definitions
 #define OUT_THREADS 1				// current number of batch processing threads
 #define MAX_THREADS 16				// maximum number of batch processing threads
 
@@ -124,7 +137,8 @@ struct sEncoderSettings
 	int LAME_EncodingMode;				// 0: CBR; 1: VBR
 	bool LAME_Flush;
 	bool LAME_NoGap;
-	int OUT_Type;						// 0: FLAC; 1: MP3
+//	int OUT_Type;						// 0: FLAC; 1: MP3
+	ENUM_RADIO_BTN_TYPE enOutType;	// which output file type to use (UI)
 	UINT OUT_Threads;					// 1..MAX_THREADS
 };
 
@@ -188,7 +202,8 @@ struct sEncodingParameters
 struct sUIParameters
 {
 	bool EncoderInUse;			// is the encoding thread running?
-	int OUT_Type;				// which output file type to use
+//	int OUT_Type;				// which output file type to use
+	ENUM_RADIO_BTN_TYPE enOutType;	// which output file type to use (UI)
 	HDROP filedrop;				// handle for dropped files
 	HWND progresstotal;			// handle for the total progress bar
 	HWND progress[MAX_THREADS];	// handle for each thread's progress bar
