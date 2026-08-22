@@ -145,6 +145,12 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 	
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
 
+	// Commando Line mode? If yes, then exit the application after processing all files
+	if (myparams->bCommandLineMode) {
+		// Exit the application
+		PostThreadMessage(myparams->MainThreadId, WM_QUIT, 0, 0);
+	}
+
 	return ALL_OK;		// only to prevent compiler warning message
 }
 

@@ -207,9 +207,11 @@ struct sUIParameters
 	bool EncoderInUse;			// is the encoding thread running?
 	ENUM_RADIO_BTN_TYPE enOutType;	// which output file type to use (UI)
 	std::vector<std::wstring> files;
+	BOOL bCommandLineMode;
 	HWND progresstotal;			// handle for the total progress bar
 	HWND progress[MAX_THREADS];	// handle for each thread's progress bar
 	HWND text;					// handle for the static text
+	DWORD MainThreadId;
 };
 
 // structure for metadata transfer

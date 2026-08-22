@@ -7,6 +7,8 @@
 extern sEncoderSettings EncSettings;					// Variable to store encoder settings
 extern TCHAR *EventLogTXT;								// variable to store event log history
 
+void ProcessCommandLineFiles(sUIParameters& ui);
+
 //
 //	FUNCTION:	About(HWND, UINT, WPARAM, LPARAM)
 //
@@ -213,11 +215,14 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	static sUIParameters UIParameters;
 	int result;
+	int argc = 0;
 
 	switch (message)
 	{
 		case WM_INITDIALOG:
+			UIParameters.MainThreadId = GetCurrentThreadId();
 			UIParameters.EncoderInUse = false;
+			UIParameters.bCommandLineMode = FALSE;
 			UIParameters.progress[0] = GetDlgItem(hDlg, IDC_PROGRESS0);
 			UIParameters.progress[1] = GetDlgItem(hDlg, IDC_PROGRESS1);
 			UIParameters.progress[2] = GetDlgItem(hDlg, IDC_PROGRESS2);
@@ -261,6 +266,11 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					break;
 			}
 
+			// Command Line?
+			if (__argc > 1) {
+				ProcessCommandLineFiles(UIParameters);	// process any files passed on the command line
+			}
+
 			return (INT_PTR)TRUE;
 
 		// process the dropped files
@@ -269,7 +279,9 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			if (!UIParameters.EncoderInUse)
 			{
 				UIParameters.EncoderInUse = true;
+				UIParameters.bCommandLineMode = FALSE;
 
+				// Get Drop file
 				HDROP hDrop = (HDROP)wParam;
 
 				UINT count = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
@@ -282,7 +294,7 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					UIParameters.files.emplace_back(buf);
 				}
 
-				DragFinish(hDrop);	 // ÅöHDROP ÇÕÇ±Ç±Ç≈èIóπ
+				DragFinish(hDrop);
 
 				CreateThread(NULL, 0,
 					(LPTHREAD_START_ROUTINE)&EncoderScheduler,
@@ -306,6 +318,35 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					break;
 			}
 			break;
+		case WM_CLOSE:
+			DestroyWindow(hDlg);
+			return (INT_PTR)TRUE;
 	}
 	return (INT_PTR)FALSE;
+}
+
+void ProcessCommandLineFiles(sUIParameters& ui)
+{
+	// Add command-line arguments to the file list
+	ui.files.clear();
+
+	for (int i = 1; i < __argc; ++i) {
+		ui.files.emplace_back(__wargv[i]);
+	}
+
+	// If command-line files were provided, start encoding immediately
+	if (!ui.files.empty()) {
+		ui.EncoderInUse = true;
+		ui.bCommandLineMode = TRUE;
+		ui.enOutType = TYPE_AUTO;
+
+		CreateThread(
+			NULL,
+			0,
+			(LPTHREAD_START_ROUTINE)&EncoderScheduler,
+			&ui,
+			0,
+			NULL
+		);
+	}
 }
