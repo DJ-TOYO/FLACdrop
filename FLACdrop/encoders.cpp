@@ -30,17 +30,17 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 typedef DWORD(WINAPI* ENC_FUNC)(LPVOID);
 
 ENC_FUNC wavTable[] = {
-	Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
-	Encode_WAV2FLAC,   // TYPE_FLAC
-	Encode_WAV2MP3,    // TYPE_MP3
-	Encode_WAV2FLAC    // TYPE_WAV?（WAV→WAVはありえないのでFLACにしておく）
+    Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
+    Encode_WAV2FLAC,   // TYPE_FLAC (this case does not occur: WAV -> FLAC is forced)
+    Encode_WAV2MP3,    // TYPE_MP3
+    Encode_WAV2FLAC    // TYPE_WAV (this case does not occur: WAV -> WAV is not meaningful, so convert to FLAC)
 };
 
 ENC_FUNC flacTable[] = {
-	Encode_FLAC2WAV,   // TYPE_AUTO → WAV
-	Encode_FLAC2MP3,   // TYPE_FLAC?（FLAC→FLACはありえないのでMP3にしておく）
-	Encode_FLAC2MP3,   // TYPE_MP3
-	Encode_FLAC2WAV    // TYPE_WAV
+    Encode_FLAC2WAV,   // TYPE_AUTO -> WAV
+    Encode_FLAC2MP3,   // TYPE_FLAC (this case does not occur: FLAC -> FLAC is not meaningful, so convert to MP3)
+    Encode_FLAC2MP3,   // TYPE_MP3
+    Encode_FLAC2WAV    // TYPE_WAV
 };
 
 DWORD WINAPI EncoderScheduler(LPVOID params)
@@ -393,10 +393,12 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		BYTE* buffer_mp3, * buffer_wav;
 		int imp3, owrite;
 		bool ok = true;
+		UINT processed_samples = 0;
+		int last_percent = -1;
 
 		// set up the progress bar boundaries
 		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
-		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, total_samples / READSIZE_MP3));
+		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 
 		// allocate memory buffers
 		buffer_wav = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
@@ -461,7 +463,23 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 					if (LAME_FLUSH == true) fflush(fout);
 				}
 
-				SendMessage(myparams->progress, PBM_DELTAPOS, 1, 0);	// increase the progress bar
+			    processed_samples += (unsigned int)need;
+
+				int percent = (int)(processed_samples * 100 / total_samples);
+				if (percent > 100) percent = 100;
+
+				if (percent != last_percent)
+				{
+					last_percent = percent;
+					SendMessage(myparams->progress, PBM_SETPOS, percent, 0);
+#if _DEBUG
+					WCHAR dbg[128];
+					swprintf_s(dbg, L"WAV2MP3 percent = %d / %d (processed=%u, total=%u)\n",
+							   percent, 100, processed_samples, total_samples);
+					OutputDebugString(dbg);
+#endif
+				}
+//				SendMessage(myparams->progress, PBM_DELTAPOS, 1, 0);	// increase the progress bar
 			}
 			left -= need;
 		}
@@ -701,8 +719,14 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		FLAC__int32 *buffer_flac;			// READSIZE * channels
 		bool ok = true;
 
+		// total_samples は WAV のサンプル数
+		int blocks = (total_samples + READSIZE_FLAC - 1) / READSIZE_FLAC;
+		int processed = 0;
+		int percent;
+		int last_percent = -1;
+    
 		// set up the progress bar boundaries and reset it
-		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, total_samples / READSIZE_FLAC));
+		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
 
 		buffer_wav = new FLAC__byte[READSIZE_FLAC * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
@@ -745,13 +769,32 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 
 				// feed samples to the encoder
 				ok = FLAC__stream_encoder_process_interleaved(encoder, buffer_flac, need);
-				SendMessage(myparams->progress, PBM_DELTAPOS, 1, 0);	// increase the progress bar
+
+				processed ++;
+
+				percent = (processed * 100) / blocks;
+				if (percent > 100) percent = 100;
+
+				if (percent != last_percent)
+				{
+					last_percent = percent;
+					SendMessage(myparams->progress, PBM_SETPOS, percent, 0);
+#if _DEBUG
+					WCHAR dbg[128];
+					swprintf_s(dbg, L"WAV2FLAC percent = %d / %d (processed=%d, blocks=%d)\n",
+						percent, 100, processed, blocks);
+					OutputDebugString(dbg);
+#endif
+				}
 			}
 			left -= need;
 		}
-		
+
 		delete[]buffer_wav;
 		delete[]buffer_flac;
+
+		// 100%
+		SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
 	}
 
 	// libFLAC: close the encoder
@@ -876,22 +919,45 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 	}
 
 	// libFLAC: start the decoding
+	int blocks = (ClientData.total_samples + ClientData.blocksize - 1) / ClientData.blocksize;
+	int processed = 0;
+	int percent;			// current progress value
+	int last_percent = -1;	// last progress value
+
 	if (err == ALL_OK)
 	{
 		FLAC__bool ok = TRUE;
 		FLAC__StreamDecoderState state;
 
 		// set up the progress bar boundaries, block size is around 4k depending on resolution
+		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
-		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, ClientData.total_samples / ClientData.blocksize));
-		
+
 		// loop the decoder until it reaches the end of the input file or returns an error
 		do
 		{
 			ok = FLAC__stream_decoder_process_single(decoder);
 			state = FLAC__stream_decoder_get_state(decoder);
-			SendMessage(myparams->progress, PBM_DELTAPOS, 1, 0);	// increase the progress bar
+
+			percent = (processed * 100) / blocks;
+			if (percent != last_percent) {
+				last_percent = percent;
+				SendMessage(myparams->progress, PBM_SETPOS, percent, 0);
+#if _DEBUG
+				WCHAR dbg[128];
+				swprintf_s(dbg, L"FLAC2WAV percent = %d / %d (processed=%d, blocks=%d)\n",
+					percent, 100, processed, blocks);
+				OutputDebugString(dbg);
+#endif
+			}
+
+			// count up
+			processed ++;
+
 		} while ((state != FLAC__STREAM_DECODER_END_OF_STREAM && FLAC__STREAM_DECODER_SEEK_ERROR && FLAC__STREAM_DECODER_ABORTED && FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR) && ok == TRUE);
+
+		// 100%
+		SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
 	}
 
 	// libFLAC: close the decoder
