@@ -119,15 +119,27 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 	}
 
 	// wait for all threads to terminate
-	if (EncSettings.OUT_Threads > NumFiles) WaitForMultipleObjects(NumFiles, aThread, TRUE, INFINITE);
-	else WaitForMultipleObjects(EncSettings.OUT_Threads, aThread, TRUE, INFINITE);
+	if (EncSettings.OUT_Threads > NumFiles){
+		WaitForMultipleObjects(NumFiles, aThread, TRUE, INFINITE);
+	} else {
+		WaitForMultipleObjects(EncSettings.OUT_Threads, aThread, TRUE, INFINITE);
+	}
 
 	myparams->EncoderInUse = false;
 
 	CloseHandle(ghSemaphore);
-	if (EncSettings.OUT_Threads > NumFiles) for (UINT i = 0; i<NumFiles; i++) CloseHandle(aThread[i]);
-	else for (UINT i = 0; i<EncSettings.OUT_Threads; i++) CloseHandle(aThread[i]);
-	
+	if (EncSettings.OUT_Threads > NumFiles){
+		for (UINT i = 0; i<NumFiles; i++) {
+			CloseHandle(aThread[i]);
+			aThread[i] = NULL;
+		}
+	} else {
+		for (UINT i = 0; i<EncSettings.OUT_Threads; i++) {
+			CloseHandle(aThread[i]);
+			aThread[i] = NULL;
+		}
+	}
+
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
 
 	// Commando Line mode? If yes, then exit the application after processing all files
