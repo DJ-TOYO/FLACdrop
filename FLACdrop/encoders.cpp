@@ -27,6 +27,22 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 //
 //	PURPOSE:	Collects the dropped files list and schedules the encoding threads
 //
+typedef DWORD(WINAPI* ENC_FUNC)(LPVOID);
+
+ENC_FUNC wavTable[] = {
+	Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
+	Encode_WAV2FLAC,   // TYPE_FLAC
+	Encode_WAV2MP3,    // TYPE_MP3
+	Encode_WAV2FLAC    // TYPE_WAV?（WAV→WAVはありえないのでFLACにしておく）
+};
+
+ENC_FUNC flacTable[] = {
+	Encode_FLAC2WAV,   // TYPE_AUTO → WAV
+	Encode_FLAC2MP3,   // TYPE_FLAC?（FLAC→FLACはありえないのでMP3にしておく）
+	Encode_FLAC2MP3,   // TYPE_MP3
+	Encode_FLAC2WAV    // TYPE_WAV
+};
+
 DWORD WINAPI EncoderScheduler(LPVOID params)
 {
 	UINT NumFiles, BufferSize;
@@ -63,72 +79,41 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 		wchar_t ch=L'.';
 		FilenameExt = wcsrchr(Filename, ch);	// search for the last "." in the filename
 
-		// Source is WAVE file
-		if (_wcsnicmp(FilenameExt, L".wav", 4) == 0)
-		{			
-			switch (myparams->enOutType)
-			{
-				case TYPE_FLAC:
-					tID = SearchFreeThread(EncParams);
-					EncParams[tID].ThreadInUse = true;
-					EncParams[tID].progress = myparams->progress[tID];
-					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
-					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_WAV2FLAC, &EncParams[tID], 0, NULL);
-					ThreadStarted = true;
-					break;
+		// 拡張子判定
+		bool isWav = (_wcsnicmp(FilenameExt, L".wav", 4) == 0);
+		bool isFlac = (_wcsnicmp(FilenameExt, L".flac", 5) == 0);
 
-				case TYPE_MP3:
-					tID = SearchFreeThread(EncParams);
-					EncParams[tID].ThreadInUse = true;
-					EncParams[tID].progress = myparams->progress[tID];
-					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
-					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_WAV2MP3, &EncParams[tID], 0, NULL);
-					ThreadStarted = true;
-					break;
-				case TYPE_AUTO:
-					tID = SearchFreeThread(EncParams);
-					EncParams[tID].ThreadInUse = true;
-					EncParams[tID].progress = myparams->progress[tID];
-					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
-					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_WAV2FLAC, &EncParams[tID], 0, NULL);
-					ThreadStarted = true;
-					break;
-			}
-		}
+		ENC_FUNC func = nullptr;
 
-		// Source is FLAC file
-		if (_wcsnicmp(FilenameExt, L".flac", 5) == 0)
+		// 同じ形式なら無視する
+		if ((isWav && myparams->enOutType == TYPE_WAV) ||
+			(isFlac && myparams->enOutType == TYPE_FLAC))
 		{
-			switch (myparams->enOutType)
-			{
-				case TYPE_WAV:
-					tID = SearchFreeThread(EncParams);
-					EncParams[tID].ThreadInUse = true;
-					EncParams[tID].progress = myparams->progress[tID];
-					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
-					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_FLAC2WAV, &EncParams[tID], 0, NULL);
-					ThreadStarted = true;
-					break;
-				
-				case TYPE_MP3:
-					tID = SearchFreeThread(EncParams);
-					EncParams[tID].ThreadInUse = true;
-					EncParams[tID].progress = myparams->progress[tID];
-					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
-					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_FLAC2MP3, &EncParams[tID], 0, NULL);
-					ThreadStarted = true;
-					break;
-				case TYPE_AUTO:
-					tID = SearchFreeThread(EncParams);
-					EncParams[tID].ThreadInUse = true;
-					EncParams[tID].progress = myparams->progress[tID];
-					wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
-					aThread[tID] = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&Encode_FLAC2WAV, &EncParams[tID], 0, NULL);
-					ThreadStarted = true;
-					break;
-			}
+			// 進捗バーだけ進める
+			SendMessage(myparams->progresstotal, PBM_DELTAPOS, 1, 0);
+			continue;
 		}
-		
+
+		if (isWav) {
+			func = wavTable[myparams->enOutType];
+		}
+		else if (isFlac) {
+			func = flacTable[myparams->enOutType];
+		}
+
+		if (func) {
+			tID = SearchFreeThread(EncParams);
+			EncParams[tID].ThreadInUse = true;
+			EncParams[tID].progress = myparams->progress[tID];
+			wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
+
+			aThread[tID] = CreateThread(NULL, 0,
+				(LPTHREAD_START_ROUTINE)func,
+				&EncParams[tID], 0, NULL);
+
+			ThreadStarted = true;
+		}
+
 		if (ThreadStarted == true) WaitForSingleObject(ghSemaphore, INFINITE);	// a thread was started so we have to decrease the count of the semaphore with one, continue only if at least one thread is free
 		else SendMessage(myparams->progresstotal, PBM_DELTAPOS, 1, 0);			// no thread was started (file extension was not recognized), but we still have to increase the total progress bar
 	}
