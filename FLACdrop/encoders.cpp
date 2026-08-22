@@ -38,7 +38,7 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 	int tID = 0;																					// actual thread id
 	bool ThreadStarted;																				// was a thread started within the loop?
 	
-	NumFiles = DragQueryFile(myparams->filedrop, 0xFFFFFFFF, NULL, 0);								// get the number of dropped files
+	NumFiles = (UINT)myparams->files.size();														// get the number of files stored in the vector
 	SendMessage(myparams->progresstotal, PBM_SETPOS, 0, 0);											// reset the total progress bar
 	for (int i = 0; i<MAX_THREADS; i++) SendMessage(myparams->progress[i], PBM_SETPOS, 0, 0);		// reset each thread's progress bar
 	SendMessage(myparams->progresstotal, PBM_SETRANGE, 0, MAKELONG(0, NumFiles));					// set the total progress bar boundaries
@@ -57,10 +57,8 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 	for(UINT i=0; i < NumFiles; i++)
 	{
 		ThreadStarted = false;
-		BufferSize = DragQueryFile(myparams->filedrop, i, NULL, 0);									// get the size of the file name buffer of the i(th) dropped file
-		if(BufferSize == 0) break;																	// something is wrong
-		DragQueryFile(myparams->filedrop, i, Filename, BufferSize + 1);								// retrieve the name of the i(th) dropped file
-		
+		wcscpy_s(Filename, MAXFILENAMELENGTH, myparams->files[i].c_str());							// get files name
+
 		// check if the extension in the filename is WAV or FLAC and start encoder algorithm accordingly
 		wchar_t ch=L'.';
 		FilenameExt = wcsrchr(Filename, ch);	// search for the last "." in the filename
@@ -139,8 +137,6 @@ DWORD WINAPI EncoderScheduler(LPVOID *params)
 	if (EncSettings.OUT_Threads > NumFiles) WaitForMultipleObjects(NumFiles, aThread, TRUE, INFINITE);
 	else WaitForMultipleObjects(EncSettings.OUT_Threads, aThread, TRUE, INFINITE);
 
-	// release the memory which the system allocated for the file name transfer
-	DragFinish(myparams->filedrop);
 	myparams->EncoderInUse = false;
 
 	CloseHandle(ghSemaphore);

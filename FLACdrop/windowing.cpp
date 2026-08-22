@@ -265,14 +265,31 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		// process the dropped files
 		case WM_DROPFILES:
-			if (UIParameters.EncoderInUse == false)	// check if the encoder thread is already running
+		{
+			if (!UIParameters.EncoderInUse)
 			{
 				UIParameters.EncoderInUse = true;
-				UIParameters.filedrop = (HDROP)wParam;
 
-				CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)&EncoderScheduler, &UIParameters, 0, NULL);	// start the encoder thread
+				HDROP hDrop = (HDROP)wParam;
+
+				UINT count = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
+				UIParameters.files.clear();
+				UIParameters.files.reserve(count);
+
+				for (UINT i = 0; i < count; i++) {
+					WCHAR buf[MAXFILENAMELENGTH];
+					DragQueryFile(hDrop, i, buf, MAXFILENAMELENGTH);
+					UIParameters.files.emplace_back(buf);
+				}
+
+				DragFinish(hDrop);	 // šHDROP ‚Í‚±‚±‚ÅI—¹
+
+				CreateThread(NULL, 0,
+					(LPTHREAD_START_ROUTINE)&EncoderScheduler,
+					&UIParameters, 0, NULL);
 			}
-			break;
+		}
+		break;
 
 		case WM_COMMAND:
 			switch (HIWORD(wParam))

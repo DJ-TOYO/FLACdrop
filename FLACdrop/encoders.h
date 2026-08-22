@@ -1,3 +1,7 @@
+#pragma once
+#include <vector>
+#include <string>
+
 #include "stream_encoder.h"
 #include "stream_decoder.h"
 #include "metadata.h"
@@ -137,7 +141,6 @@ struct sEncoderSettings
 	int LAME_EncodingMode;				// 0: CBR; 1: VBR
 	bool LAME_Flush;
 	bool LAME_NoGap;
-//	int OUT_Type;						// 0: FLAC; 1: MP3
 	ENUM_RADIO_BTN_TYPE enOutType;	// which output file type to use (UI)
 	UINT OUT_Threads;					// 1..MAX_THREADS
 };
@@ -202,9 +205,8 @@ struct sEncodingParameters
 struct sUIParameters
 {
 	bool EncoderInUse;			// is the encoding thread running?
-//	int OUT_Type;				// which output file type to use
 	ENUM_RADIO_BTN_TYPE enOutType;	// which output file type to use (UI)
-	HDROP filedrop;				// handle for dropped files
+	std::vector<std::wstring> files;
 	HWND progresstotal;			// handle for the total progress bar
 	HWND progress[MAX_THREADS];	// handle for each thread's progress bar
 	HWND text;					// handle for the static text
