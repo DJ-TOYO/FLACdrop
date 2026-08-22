@@ -53,7 +53,9 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 	WCHAR *FilenameExt;
 	int tID = 0;																					// actual thread id
 	bool ThreadStarted;																				// was a thread started within the loop?
-	
+	int startedThreads = 0;
+	HANDLE waitHandles[MAX_THREADS] = { 0 };
+
 	NumFiles = (UINT)myparams->files.size();														// get the number of files stored in the vector
 	SendMessage(myparams->progresstotal, PBM_SETPOS, 0, 0);											// reset the total progress bar
 	for (int i = 0; i<MAX_THREADS; i++) SendMessage(myparams->progress[i], PBM_SETPOS, 0, 0);		// reset each thread's progress bar
@@ -107,9 +109,14 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 			EncParams[tID].progress = myparams->progress[tID];
 			wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
 
-			aThread[tID] = CreateThread(NULL, 0,
+			HANDLE h = CreateThread(NULL, 0,
 				(LPTHREAD_START_ROUTINE)func,
 				&EncParams[tID], 0, NULL);
+
+
+			aThread[tID] = h;
+			waitHandles[startedThreads] = h;  // Wait/Close —p‚Ì˜A‘±”z—ñ
+			startedThreads ++;
 
 			ThreadStarted = true;
 		}
@@ -119,25 +126,20 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 	}
 
 	// wait for all threads to terminate
-	if (EncSettings.OUT_Threads > NumFiles){
-		WaitForMultipleObjects(NumFiles, aThread, TRUE, INFINITE);
-	} else {
-		WaitForMultipleObjects(EncSettings.OUT_Threads, aThread, TRUE, INFINITE);
-	}
+	WaitForMultipleObjects(startedThreads, waitHandles, TRUE, INFINITE);
 
 	myparams->EncoderInUse = false;
 
 	CloseHandle(ghSemaphore);
-	if (EncSettings.OUT_Threads > NumFiles){
-		for (UINT i = 0; i<NumFiles; i++) {
-			CloseHandle(aThread[i]);
-			aThread[i] = NULL;
+
+	for (UINT i = 0; i < startedThreads; i++) {
+		if(waitHandles[i] != NULL) {
+			CloseHandle(waitHandles[i]);
 		}
-	} else {
-		for (UINT i = 0; i<EncSettings.OUT_Threads; i++) {
-			CloseHandle(aThread[i]);
-			aThread[i] = NULL;
-		}
+	}
+
+	for (int i = 0; i < MAX_THREADS; i++) {
+		aThread[i] = NULL;
 	}
 
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
