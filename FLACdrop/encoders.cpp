@@ -27,7 +27,7 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 //
 //	PURPOSE:	Collects the dropped files list and schedules the encoding threads
 //
-DWORD WINAPI EncoderScheduler(LPVOID *params)
+DWORD WINAPI EncoderScheduler(LPVOID params)
 {
 	UINT NumFiles, BufferSize;
 	static HANDLE aThread[MAX_THREADS];																// array for the thread identifiers
@@ -194,7 +194,7 @@ void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *fi
 //
 //	PURPOSE:	Encode WAV stream to MP3 stream
 //
-DWORD WINAPI Encode_WAV2MP3(LPVOID *params)
+DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 {
 	sEncodingParameters *myparams = (sEncodingParameters*)params;
 	sWAVEheader WAVEheader;
@@ -509,7 +509,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID *params)
 //
 //	PURPOSE:	Encode WAV stream to FLAC stream
 //
-DWORD WINAPI Encode_WAV2FLAC(LPVOID *params)
+DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 {
 	sEncodingParameters *myparams = (sEncodingParameters*)params;
 	FLAC__StreamEncoder *encoder = NULL;
@@ -774,7 +774,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID *params)
 //
 //	PURPOSE:	Encode FLAC stream to WAV stream
 //
-DWORD WINAPI Encode_FLAC2WAV(LPVOID* params)
+DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 {
 	sEncodingParameters* myparams = (sEncodingParameters*)params;
 	FLAC__StreamDecoder* decoder = 0;
@@ -927,7 +927,7 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID* params)
 //
 //	PURPOSE:	Encode FLAC stream to MP3 stream, transfer the tags also
 //
-DWORD WINAPI Encode_FLAC2MP3(LPVOID* params)
+DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 {
 	sEncodingParameters* myparams = (sEncodingParameters*)params;
 	sMetaData MetaDataTrans[MD_NUMBER];
