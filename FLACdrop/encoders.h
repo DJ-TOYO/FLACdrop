@@ -211,7 +211,8 @@ struct sUIParameters
 	HWND progresstotal;			// handle for the total progress bar
 	HWND progress[MAX_THREADS];	// handle for each thread's progress bar
 	HWND text;					// handle for the static text
-	DWORD MainThreadId;
+	HWND hMainWnd;				// handle for MainForm
+	DWORD MainThreadId;			// Main Thread ID
 };
 
 // structure for metadata transfer

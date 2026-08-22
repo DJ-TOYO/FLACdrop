@@ -45,7 +45,7 @@ ENC_FUNC flacTable[] = {
 
 DWORD WINAPI EncoderScheduler(LPVOID params)
 {
-	UINT NumFiles, BufferSize;
+	UINT NumFiles;
 	static HANDLE aThread[MAX_THREADS];																// array for the thread identifiers
 	sUIParameters *myparams =(sUIParameters*)params;												// load the parameter list to the internal structure
 	static sEncodingParameters EncParams[MAX_THREADS];												// parameter list for each encoding thread
@@ -53,7 +53,7 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 	WCHAR *FilenameExt;
 	int tID = 0;																					// actual thread id
 	bool ThreadStarted;																				// was a thread started within the loop?
-	int startedThreads = 0;
+	UINT startedThreads = 0;
 	HANDLE waitHandles[MAX_THREADS] = { 0 };
 
 	NumFiles = (UINT)myparams->files.size();														// get the number of files stored in the vector
@@ -149,6 +149,9 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 		// Exit the application
 		PostThreadMessage(myparams->MainThreadId, WM_QUIT, 0, 0);
 	}
+
+	// Post Message UI Enable
+	PostMessage(myparams->hMainWnd, WM_USER_ENABLE_UI, 0, 0);
 
 	return ALL_OK;		// only to prevent compiler warning message
 }

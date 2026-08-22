@@ -8,6 +8,7 @@ extern sEncoderSettings EncSettings;					// Variable to store encoder settings
 extern TCHAR *EventLogTXT;								// variable to store event log history
 
 void ProcessCommandLineFiles(sUIParameters& ui);
+void EnableUI(HWND hDlg, BOOL bEnable = TRUE);
 
 //
 //	FUNCTION:	About(HWND, UINT, WPARAM, LPARAM)
@@ -219,8 +220,10 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 	switch (message)
 	{
+		// initialize the dialog box
 		case WM_INITDIALOG:
 			UIParameters.MainThreadId = GetCurrentThreadId();
+			UIParameters.hMainWnd = hDlg;
 			UIParameters.EncoderInUse = false;
 			UIParameters.bCommandLineMode = FALSE;
 			UIParameters.progress[0] = GetDlgItem(hDlg, IDC_PROGRESS0);
@@ -296,6 +299,7 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 				DragFinish(hDrop);
 
+				EnableUI(hDlg, FALSE);	// disable the UI while encoding is in progress
 				CreateThread(NULL, 0,
 					(LPTHREAD_START_ROUTINE)&EncoderScheduler,
 					&UIParameters, 0, NULL);
@@ -318,11 +322,25 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					break;
 			}
 			break;
-		case WM_CLOSE:
-			DestroyWindow(hDlg);
-			return (INT_PTR)TRUE;
+
+		case WM_USER_ENABLE_UI:
+			EnableUI(hDlg, TRUE);
+			break;
 	}
 	return (INT_PTR)FALSE;
+}
+
+void EnableUI(HWND hDlg, BOOL bEnable)
+{
+	EnableWindow(GetDlgItem(hDlg, IDC_RADIO_OUT_FLAC), bEnable);
+	EnableWindow(GetDlgItem(hDlg, IDC_RADIO_OUT_MP3), bEnable);
+	EnableWindow(GetDlgItem(hDlg, IDC_RADIO_OUT_WAV), bEnable);
+	EnableWindow(GetDlgItem(hDlg, IDC_RADIO_OUT_AUTO), bEnable);
+
+	HMENU hMenu = GetMenu(GetParent(hDlg));
+	EnableMenuItem(hMenu, IDM_OPTIONS, bEnable ? MF_ENABLED : MF_GRAYED);
+	EnableMenuItem(hMenu, IDM_EVENTLOG, bEnable ? MF_ENABLED : MF_GRAYED);
+	EnableMenuItem(hMenu, IDM_EXIT, bEnable ? MF_ENABLED : MF_GRAYED);
 }
 
 void ProcessCommandLineFiles(sUIParameters& ui)
@@ -340,6 +358,7 @@ void ProcessCommandLineFiles(sUIParameters& ui)
 		ui.bCommandLineMode = TRUE;
 		ui.enOutType = TYPE_AUTO;
 
+		EnableUI(ui.hMainWnd, FALSE);
 		CreateThread(
 			NULL,
 			0,
