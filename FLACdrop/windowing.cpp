@@ -267,7 +267,12 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				case TYPE_AUTO:
 					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_AUTO, IDC_RADIO_OUT_AUTO);
 					break;
+				default:
+					CheckRadioButton(hDlg, IDC_RADIO_OUT_FLAC, IDC_RADIO_OUT_AUTO, IDC_RADIO_OUT_AUTO);
+					EncSettings.enOutType = TYPE_AUTO;
+					break;
 			}
+			UIParameters.enOutType = EncSettings.enOutType;
 
 			// Command Line?
 			if (__argc > 1) {
