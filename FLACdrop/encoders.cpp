@@ -708,18 +708,67 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		}
 	}
 
-	// WAV: check if the WAVE file has 16 or 24 bit resolution
+	// WAV: determine whether the input format is PCM or IEEE float
+	bool is_float = false;
+
 	if (err == ALL_OK)
 	{
-		switch (FMTheader.BitsPerSample)
+		WORD fmt = FMTheader.AudioFormat;
+		WORD sub = FMTheader.SubFormat_AudioFormat;
+
+		// Check AudioFormat (PCM / FLOAT / EXTENSIBLE)
+		if (fmt == WAVE_FORMAT_PCM)
 		{
-		case 16:
-		case 24:
-		case 32:
-			break;
-		default:
+			is_float = false;
+		}
+		else if (fmt == WAVE_FORMAT_IEEE_FLOAT)
+		{
+			is_float = true;
+		}
+		else if (fmt == WAVE_FORMAT_EXTENSIBLE)
+		{
+			// EXTENSIBLE: the first two bytes of SubFormat define PCM or FLOAT
+			if (sub == WAVE_FORMAT_PCM)
+				is_float = false;
+			else if (sub == WAVE_FORMAT_IEEE_FLOAT)
+				is_float = true;
+			else
+			{
+				fclose(fin);
+				err = FAIL_WAV_UNSUPPORTED;
+			}
+		}
+		else
+		{
 			fclose(fin);
-			err = FAIL_LIBFLAC_ONLY_16_24_BIT;
+			err = FAIL_WAV_UNSUPPORTED;
+		}
+	}
+
+	// WAV: check bit depth (PCM and FLOAT have different valid ranges)
+	if (err == ALL_OK)
+	{
+		if (!is_float)
+		{
+			// PCM: FLAC supports 16, 20, and 24-bit integer samples (20-bit is stored in 24-bit container)
+			if (FMTheader.BitsPerSample != 16 &&
+				FMTheader.BitsPerSample != 20 &&
+				FMTheader.BitsPerSample != 24)
+			{
+				fclose(fin);
+				err = FAIL_LIBFLAC_ONLY_16_24_BIT;
+			}
+		}
+		else
+		{
+			// FLOAT: allow 32-bit float and 64-bit float input
+			// (conversion to 24-bit integer will be done later)
+			if (FMTheader.BitsPerSample != 32 &&
+				FMTheader.BitsPerSample != 64)
+			{
+				fclose(fin);
+				err = FAIL_WAV_UNSUPPORTED;
+			}
 		}
 	}
 
@@ -734,7 +783,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		fseek(fin, -DATAheader.ChunkSize, SEEK_CUR);													// go back to the beginning of the data chunk
 		total_samples = DATAheader.ChunkSize / FMTheader.NumChannels / (FMTheader.BitsPerSample / 8);	// sound data's size divided by one sample's size
 	}
-   
+
 	// libFLAC: allocate the libFLAC encoder and data buffers
 	if (err == ALL_OK)
 	{
@@ -753,9 +802,22 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		ok &= FLAC__stream_encoder_set_verify(encoder, EncSettings.FLAC_Verify);
 		ok &= FLAC__stream_encoder_set_compression_level(encoder, EncSettings.FLAC_EncodingQuality);
 		ok &= FLAC__stream_encoder_set_channels(encoder, FMTheader.NumChannels);
-		ok &= FLAC__stream_encoder_set_bits_per_sample(encoder, FMTheader.BitsPerSample);
 		ok &= FLAC__stream_encoder_set_sample_rate(encoder, FMTheader.SampleRate);
 		ok &= FLAC__stream_encoder_set_total_samples_estimate(encoder, total_samples);
+
+		// FLAC: bits_per_sample must be <= 24
+		unsigned flac_bps = 0;
+		if (!is_float)
+		{
+			// PCM: use original bit depth (16 or 24)
+			flac_bps = FMTheader.BitsPerSample;
+		}
+		else
+		{
+			// FLOAT: always convert to 24-bit integer for FLAC
+			flac_bps = 24;
+		}
+		ok &= FLAC__stream_encoder_set_bits_per_sample(encoder, flac_bps);
 
 		if (ok == false)
 		{
@@ -867,6 +929,44 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 							buffer_flac[i] |= buffer_wav[3*i+1] << 8;
 							buffer_flac[i] |= buffer_wav[3*i];
 							if (buffer_flac[i] & 0x800000) buffer_flac[i] |= 0xff000000; // correct the top 8 bit to have correct 2nd complement code
+						}
+						break;
+					case 32:
+						if (is_float)
+						{
+							// convert 32-bit IEEE float [-1.0, +1.0] to 24-bit integer range
+							for (i = 0; i < need * FMTheader.NumChannels; i++)
+							{
+								float f;
+								memcpy(&f, buffer_wav + 4 * i, 4); // little-endian float
+								double d = (double)f;
+								if (d > 1.0) d = 1.0;
+								if (d < -1.0) d = -1.0;
+								buffer_flac[i] = (FLAC__int32)(d * 8388607.0); // 0x7FFFFF
+							}
+						}
+						else
+						{
+							// convert 32-bit integer PCM Å® 24-bit integer (FLAC)
+							int32_t* src = (int32_t*)buffer_wav;
+							for (i = 0; i < need * FMTheader.NumChannels; i++)
+							{
+								buffer_flac[i] = src[i] >> 8;	// è„à 24bitÇíäèo
+							}
+						}
+						break;
+					case 64:
+						if (is_float)
+						{
+							// convert 64-bit IEEE double [-1.0, +1.0] to 24-bit integer range
+							for (i = 0; i < need * FMTheader.NumChannels; i++)
+							{
+								double d;
+								memcpy(&d, buffer_wav + 8 * i, 8); // little-endian double
+								if (d > 1.0) d = 1.0;
+								if (d < -1.0) d = -1.0;
+								buffer_flac[i] = (FLAC__int32)(d * 8388607.0);
+							}
 						}
 						break;
 				}
