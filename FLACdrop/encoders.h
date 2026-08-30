@@ -69,6 +69,7 @@ typedef enum
 
 //WAVE file audio formats
 // http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/WAVE.html
+#define WAVE_FORMAT_UNKNOWN		0x0000	// Microsoft unknown format
 #define WAVE_FORMAT_PCM			0x0001	// PCM
 #define WAVE_FORMAT_IEEE_FLOAT	0x0003	// IEEE float
 #define WAVE_FORMAT_ALAW		0x0006	// 8 - bit ITU - T G.711 A - law

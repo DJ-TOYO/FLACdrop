@@ -262,10 +262,28 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		switch (FMTheader.AudioFormat)
 		{
 		case WAVE_FORMAT_PCM:
+		case WAVE_FORMAT_IEEE_FLOAT:
 			break;
 		case WAVE_FORMAT_EXTENSIBLE:
 			// in this case the first two byte of the SubFormat is defining the audio format
-			if (FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_PCM)
+			if (FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_PCM &&
+				FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_IEEE_FLOAT)
+			{
+				fclose(fin);
+				err = FAIL_WAV_UNSUPPORTED;
+			}
+			break;
+		case WAVE_FORMAT_UNKNOWN:
+			if (FMTheader.NumChannels < 1 || FMTheader.NumChannels > 2)
+			{
+				fclose(fin);
+				err = FAIL_WAV_UNSUPPORTED;
+			}
+			else if (FMTheader.BitsPerSample != 16 &&
+				FMTheader.BitsPerSample != 20 &&
+				FMTheader.BitsPerSample != 24 &&
+				FMTheader.BitsPerSample != 32 &&
+				FMTheader.BitsPerSample != 64)
 			{
 				fclose(fin);
 				err = FAIL_WAV_UNSUPPORTED;
@@ -274,6 +292,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		default:
 			fclose(fin);
 			err = FAIL_WAV_UNSUPPORTED;
+			break;
 		}
 	}
 
@@ -282,12 +301,17 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	{
 		switch (FMTheader.BitsPerSample)
 		{
-		case 16:
+		case 16:   // そのまま
+		case 20:   // 後段で 20→16bit に変換
+		case 24:   // 後段で 24→16bit に変換
+		case 32:   // 後段で 32→16bit に変換（float / int 両方）
+		case 64:   // 後段で 64→16bit に変換（float）
 			break;
-		case 24:
+
 		default:
 			fclose(fin);
 			err = FAIL_LAME_ONLY_16_BIT;
+			break;
 		}
 	}
 
@@ -390,7 +414,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	if (err == ALL_OK)
 	{
 		size_t left, need;
-		BYTE* buffer_mp3, * buffer_wav;
+		BYTE* buffer_mp3, * buffer_wav, * buffer_wav_tmp;
 		int imp3, owrite;
 		bool ok = true;
 		UINT processed_samples = 0;
@@ -401,7 +425,8 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 
 		// allocate memory buffers
-		buffer_wav = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
+		buffer_wav_tmp = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
+		buffer_wav = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * 2];
 		buffer_mp3 = new BYTE[LAME_MAXMP3BUFFER];
 
 //		size_t  id3v2_size;
@@ -436,13 +461,88 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		while (ok && left)
 		{
 			need = (left > READSIZE_MP3 ? (size_t)READSIZE_MP3 : left);	// calculate the number of samples to read
-			if (fread(buffer_wav, (size_t)FMTheader.NumChannels * (FMTheader.BitsPerSample / 8), need, fin) != need)
+			if (fread(buffer_wav_tmp, (size_t)FMTheader.NumChannels * (FMTheader.BitsPerSample / 8), need, fin) != need)
 			{
 				// error during reading from WAVE file
 				ok = false;
 			}
 			else
 			{
+				// 16bit → 16bit
+				if (FMTheader.BitsPerSample == 16)
+				{
+					memcpy(buffer_wav, buffer_wav_tmp, need * FMTheader.NumChannels * 2);
+				}
+				// 20bit → 16bit
+				else if (FMTheader.BitsPerSample == 20)
+				{
+					for (size_t i = 0; i < need * FMTheader.NumChannels; i++)
+					{
+						int32_t s20 =
+							buffer_wav_tmp[i * 3 + 0] |
+							buffer_wav_tmp[i * 3 + 1] << 8 |
+							buffer_wav_tmp[i * 3 + 2] << 16;
+
+						((short*)buffer_wav)[i] = (short)(s20 >> 12); // 20bit → 16bit
+					}
+				}
+				// 24bit → 16bit
+				else if (FMTheader.BitsPerSample == 24)
+				{
+					for (size_t i = 0; i < need * FMTheader.NumChannels; i++)
+					{
+						int32_t s24 =
+							buffer_wav_tmp[i * 3 + 0] |
+							buffer_wav_tmp[i * 3 + 1] << 8 |
+							buffer_wav_tmp[i * 3 + 2] << 16;
+
+						((short*)buffer_wav)[i] = (short)(s24 >> 8);
+					}
+				}
+				// 32bit int → 16bit（PCM / EXTENSIBLE-PCM）
+				else if (FMTheader.BitsPerSample == 32 &&
+					(FMTheader.AudioFormat == WAVE_FORMAT_PCM ||
+						(FMTheader.AudioFormat == WAVE_FORMAT_EXTENSIBLE &&
+							FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_PCM)))
+				{
+					int32_t* src = (int32_t*)buffer_wav_tmp;
+					short* dst = (short*)buffer_wav;
+
+					for (size_t i = 0; i < need * FMTheader.NumChannels; i++)
+					{
+						dst[i] = (short)(src[i] >> 16);
+					}
+				}
+				// 32bit float → 16bit（IEEE_FLOAT / EXTENSIBLE-FLOAT）
+				else if (FMTheader.BitsPerSample == 32 &&
+					(FMTheader.AudioFormat == WAVE_FORMAT_IEEE_FLOAT ||
+						(FMTheader.AudioFormat == WAVE_FORMAT_EXTENSIBLE &&
+							FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_IEEE_FLOAT)))
+				{
+					float* src = (float*)buffer_wav_tmp;
+					short* dst = (short*)buffer_wav;
+
+					for (size_t i = 0; i < need * FMTheader.NumChannels; i++)
+					{
+						dst[i] = (short)(src[i] * 32767.0f);
+					}
+				}
+				// 64bit float → 16bit（IEEE_FLOAT / EXTENSIBLE-FLOAT）
+				else if (FMTheader.BitsPerSample == 64 &&
+					(FMTheader.AudioFormat == WAVE_FORMAT_IEEE_FLOAT ||
+						(FMTheader.AudioFormat == WAVE_FORMAT_EXTENSIBLE &&
+							FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_IEEE_FLOAT)))
+				{
+					double* src = (double*)buffer_wav_tmp;
+					short* dst = (short*)buffer_wav;
+
+					for (size_t i = 0; i < need * FMTheader.NumChannels; i++)
+					{
+						dst[i] = (short)(src[i] * 32767.0);
+					}
+				}
+
+
 				// feed samples to the encoder
 				switch (FMTheader.NumChannels)
 				{
@@ -500,6 +600,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 
 		if (LAME_FLUSH == true && ok == true) fflush(fout);
 
+		delete[]buffer_wav_tmp;
 		delete[]buffer_wav;
 		delete[]buffer_mp3;
 
@@ -590,10 +691,12 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		switch (FMTheader.AudioFormat)
 		{
 			case WAVE_FORMAT_PCM:
+			case WAVE_FORMAT_IEEE_FLOAT:
 				break;
 			case WAVE_FORMAT_EXTENSIBLE:
 				// in this case the first two byte of the SubFormat is defining the audio format
-				if (FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_PCM)
+				if (FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_PCM &&
+					FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_IEEE_FLOAT)
 				{
 					fclose(fin);
 					err = FAIL_WAV_UNSUPPORTED;
@@ -612,6 +715,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		{
 		case 16:
 		case 24:
+		case 32:
 			break;
 		default:
 			fclose(fin);
