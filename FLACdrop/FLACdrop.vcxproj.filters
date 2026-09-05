@@ -92,6 +92,15 @@
     <ClInclude Include="..\libFLAC\include\FLAC\stream_encoder.h">
       <Filter>Header Files\libFLAC</Filter>
     </ClInclude>
+    <ClInclude Include="encoderFlac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoderWav.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="encoderMp3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -110,6 +119,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="libFLAC_callbacks.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoderFlac.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoderWav.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="encoderMp3.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

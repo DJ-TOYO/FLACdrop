@@ -223,10 +223,10 @@ struct sMetaData
 	bool present;
 };
 
-// encoder algorithms
-DWORD WINAPI Encode_WAV2FLAC(LPVOID params);
-DWORD WINAPI Encode_WAV2MP3(LPVOID params);
-DWORD WINAPI Encode_FLAC2WAV(LPVOID params);
-DWORD WINAPI Encode_FLAC2MP3(LPVOID params);
+extern sEncoderSettings EncSettings;			// variable to store encoder settings
+extern TCHAR *EventLogTXT;						// variable to store event log history
+extern HANDLE ghSemaphore;						// handle for the semaphore
 
+// encoder algorithms
 DWORD WINAPI EncoderScheduler(LPVOID params);
+void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);
