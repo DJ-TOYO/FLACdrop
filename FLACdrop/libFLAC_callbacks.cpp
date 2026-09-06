@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "encoders.h"
 
 // IO callback functions for libFLAC stream handling
@@ -299,11 +299,11 @@ void error_callback_2WAV(const FLAC__StreamDecoder *decoder, FLAC__StreamDecoder
 }
 
 //
-//	FUNCTION:	write_callback_2MEM(const FLAC__StreamDecoder*, const FLAC__Frame*, const FLAC__int32* const, void)
+//	FUNCTION:	write_callback_2MP3(const FLAC__StreamDecoder*, const FLAC__Frame*, const FLAC__int32* const, void)
 //
 //	PURPOSE:	Decodes the FLAC stream block to memory buffer
 //
-FLAC__StreamDecoderWriteStatus write_callback_2MEM(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 * const buffer[], void *client_data)
+FLAC__StreamDecoderWriteStatus write_callback_2MP3(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 * const buffer[], void *client_data)
 {
 	UNREFERENCED_PARAMETER(decoder);
 	UNREFERENCED_PARAMETER(frame);
@@ -316,6 +316,7 @@ FLAC__StreamDecoderWriteStatus write_callback_2MEM(const FLAC__StreamDecoder *de
 	switch (((sClientData*)client_data)->bps)
 	{
 		case 16:
+			// 16‑bit FLAC → store as‑is (2 bytes per sample)
 			for (chan = 0; chan<((sClientData*)client_data)->channels; chan++)
 			{
 				for (pos = 0; pos<frame->header.blocksize; pos++)
@@ -329,16 +330,25 @@ FLAC__StreamDecoderWriteStatus write_callback_2MEM(const FLAC__StreamDecoder *de
 			break;
 		
 		case 24:
-			for (chan = 0; chan<((sClientData*)client_data)->channels; chan++)
+			// 24‑bit FLAC → down‑convert to 16‑bit (upper 16 bits)
+			// LAME only accepts 16‑bit PCM, so we discard the lowest 8 bits.
+			for (chan = 0; chan < ((sClientData*)client_data)->channels; chan++)
 			{
-				for (pos = 0; pos<frame->header.blocksize; pos++)
+				for (pos = 0; pos < frame->header.blocksize; pos++)
 				{
+					// FLAC provides samples as 32‑bit signed integers.
 					temp = buffer[chan][pos];
-					((sClientData*)client_data)->buffer_out[((sClientData*)client_data)->channels*pos * 3 + chan * 3] = (FLAC__byte)temp;
-					temp = temp >> 8;
-					((sClientData*)client_data)->buffer_out[((sClientData*)client_data)->channels*pos * 3 + chan * 3 + 1] = (FLAC__byte)temp;
-					temp = temp >> 8;
-					((sClientData*)client_data)->buffer_out[((sClientData*)client_data)->channels*pos * 3 + chan * 3 + 2] = (FLAC__byte)temp;
+					temp >>= 8;   // Convert 24‑bit → 16‑bit by shifting out the lowest byte.
+
+					// Store as 16‑bit PCM (2 bytes)
+					((sClientData*)client_data)->buffer_out[
+						((sClientData*)client_data)->channels * pos * 2 + chan * 2
+					] = (FLAC__byte)temp;
+
+					temp >>= 8;
+					((sClientData*)client_data)->buffer_out[
+						((sClientData*)client_data)->channels * pos * 2 + chan * 2 + 1
+					] = (FLAC__byte)temp;
 				}
 			}
 			break;

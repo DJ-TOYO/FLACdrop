@@ -9,7 +9,7 @@ void metadata_callback_2FLAC(const FLAC__StreamEncoder *encoder, const FLAC__Str
 
 // callback functions for libFLAC decoder stream handling
 FLAC__StreamDecoderWriteStatus write_callback_2WAV(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 * const buffer[], void *client_data);
-FLAC__StreamDecoderWriteStatus write_callback_2MEM(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 * const buffer[], void *client_data);
+FLAC__StreamDecoderWriteStatus write_callback_2MP3(const FLAC__StreamDecoder *decoder, const FLAC__Frame *frame, const FLAC__int32 * const buffer[], void *client_data);
 FLAC__StreamDecoderReadStatus read_callback_2WAV(const FLAC__StreamDecoder *decoder, FLAC__byte buffer[], size_t *bytes, void *client_data);	// OK also for decoding to memory
 FLAC__StreamDecoderSeekStatus seek_callback_2WAV(const FLAC__StreamDecoder *decoder, FLAC__uint64 absolute_byte_offset, void *client_data);		// OK also for decoding to memory
 FLAC__StreamDecoderTellStatus tell_callback_2WAV(const FLAC__StreamDecoder *decoder, FLAC__uint64 *absolute_byte_offset, void *client_data);	// OK also for decoding to memory

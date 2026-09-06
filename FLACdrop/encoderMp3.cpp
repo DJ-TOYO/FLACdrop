@@ -483,7 +483,7 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	// libFLAC: initialize decoder, write callback function is "_2MEM"
 	if (err == ALL_OK)
 	{
-		if (FLAC__stream_decoder_init_stream(decoder, read_callback_2WAV, seek_callback_2WAV, tell_callback_2WAV, length_callback_2WAV, eof_callback_2WAV, write_callback_2MEM, metadata_callback_2WAV, error_callback_2WAV, &ClientData) != FLAC__STREAM_DECODER_INIT_STATUS_OK)
+		if (FLAC__stream_decoder_init_stream(decoder, read_callback_2WAV, seek_callback_2WAV, tell_callback_2WAV, length_callback_2WAV, eof_callback_2WAV, write_callback_2MP3, metadata_callback_2WAV, error_callback_2WAV, &ClientData) != FLAC__STREAM_DECODER_INIT_STATUS_OK)
 		{
 			fclose(fin);
 			FLAC__stream_decoder_delete(decoder);
@@ -509,8 +509,8 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		switch (ClientData.bps)
 		{
 		case 16:
-			break;
 		case 24:
+			break;
 		default:
 			fclose(fin);
 			FLAC__stream_decoder_delete(decoder);
