@@ -14,9 +14,10 @@
 #define MAXMETADATA 1024			// maximum character size of metadata string
 
 // selectable output types
-#define OUT_TYPE_FLAC 0
-#define OUT_TYPE_MP3 1
-#define OUT_TYPE_WAV 2
+#define OUT_TYPE_UNKNOWN 0
+#define OUT_TYPE_FLAC 1
+#define OUT_TYPE_MP3 2
+#define OUT_TYPE_WAV 3
 
 // selectable output types(UI)
 typedef enum
@@ -192,6 +193,12 @@ struct sClientData
 	unsigned int blocksize;
 };
 
+// forward declaration of the structure
+struct sEncodingParameters;
+
+// function pointer type for encoder functions
+typedef DWORD(WINAPI* ENC_FUNC)(LPVOID);
+
 // structure for the encoder thread status variables
 struct sEncodingParameters
 {
@@ -200,6 +207,9 @@ struct sEncodingParameters
 	HWND progresstotal;					// handle for the total progress bar
 	HWND progress;						// handle for thread's progress bar
 	HWND text;							// handle for the static text
+	ENC_FUNC func;						// encoder function
+	DWORD ExitCode; 					// last exit code of this thread *Result
+	int OutputType; 					// OUT_TYPE_FLAC / MP3 / WAV     *Result
 };
 
 // structure for EncoderScheduler parameters
@@ -229,4 +239,4 @@ extern HANDLE ghSemaphore;						// handle for the semaphore
 
 // encoder algorithms
 DWORD WINAPI EncoderScheduler(LPVOID params);
-void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);
+//void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);

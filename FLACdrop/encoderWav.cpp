@@ -176,6 +176,7 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 	}
 
 	myparams->ThreadInUse = false;
-	ExitEncThread(err, ghSemaphore, myparams->progresstotal, myparams->filename, OUT_TYPE_WAV);
+	myparams->OutputType = OUT_TYPE_WAV;
+
 	return ALL_OK;
 }

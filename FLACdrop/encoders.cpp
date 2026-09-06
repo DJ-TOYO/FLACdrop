@@ -11,6 +11,9 @@ extern sEncoderSettings EncSettings;			// variable to store encoder settings
 extern TCHAR *EventLogTXT;						// variable to store event log history
 HANDLE ghSemaphore;								// handle for the semaphore
 
+DWORD WINAPI EncoderFunctionExecThread(LPVOID p);
+void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);
+
 //
 //	FUNCTION: SearchFreeThread()
 //
@@ -30,8 +33,6 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 //
 //	PURPOSE:	Collects the dropped files list and schedules the encoding threads
 //
-typedef DWORD(WINAPI* ENC_FUNC)(LPVOID);
-
 ENC_FUNC wavTable[] = {
     Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
     Encode_WAV2FLAC,   // TYPE_FLAC (this case does not occur: WAV -> FLAC is forced)
@@ -111,11 +112,17 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 			EncParams[tID].ThreadInUse = true;
 			EncParams[tID].progress = myparams->progress[tID];
 			wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
+			EncParams[tID].func = func;
+			EncParams[tID].OutputType = OUT_TYPE_UNKNOWN;
+			EncParams[tID].ExitCode = 0;
 
 			HANDLE h = CreateThread(NULL, 0,
-				(LPTHREAD_START_ROUTINE)func,
+				EncoderFunctionExecThread,   // スレッド本体はこちら
 				&EncParams[tID], 0, NULL);
 
+//			HANDLE h = CreateThread(NULL, 0,
+//				(LPTHREAD_START_ROUTINE)func,
+//				&EncParams[tID], 0, NULL);
 
 			aThread[tID] = h;
 			waitHandles[startedThreads] = h;  // Wait/Close 用の連続配列
@@ -160,6 +167,31 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 }
 
 //
+//	FUNCTION:	DWORD EncoderFunctionExecThread(LPVOID p)
+//
+//	PURPOSE:	the encoder function thread run.
+//
+DWORD WINAPI EncoderFunctionExecThread(LPVOID p)
+{
+	sEncodingParameters* prm = (sEncodingParameters*)p;
+
+	// call encoder function
+	DWORD exitCode = prm->func(prm);
+
+	// store exit code
+	prm->ExitCode = exitCode;
+
+	// unified thread exit handler
+	ExitEncThread(exitCode,
+				  ghSemaphore,
+				  prm->progresstotal,
+				  prm->filename,
+				  prm->OutputType);
+
+	return exitCode;
+}
+
+//
 //	FUNCTION:	ExitEncThread(int, HANDLE, HWND)
 //
 //	PURPOSE:	Exits the encoder thread, releases the semaphore and updates event log
@@ -167,30 +199,33 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type)
 {
 	WCHAR rn[] = L"\r\n";
-	WCHAR FLAC[] = L"Output type: FLAC\r\n";
-	WCHAR MP3[] = L"Output type: MP3\r\n";
-	WCHAR WAV[] = L"Output type: WAV\r\n";
+
+	static const WCHAR* OutputTypeText[] = {
+		L"Output type: UNKNOWN\r\n",	// OUT_TYPE_UNKNOWN = 0
+		L"Output type: FLAC\r\n",		// OUT_TYPE_FLAC = 1
+		L"Output type: MP3\r\n",		// OUT_TYPE_MP3  = 2
+		L"Output type: WAV\r\n" 		// OUT_TYPE_WAV  = 3
+	};
 
 	wcscat_s(EventLogTXT, EVENTLOGSIZE, filename);
 	wcscat_s(EventLogTXT, EVENTLOGSIZE, rn);
 
-	switch (type)
-	{
+	int idx = type;
+	switch(type){
+		case OUT_TYPE_UNKNOWN:
 		case OUT_TYPE_FLAC:
-			wcscat_s(EventLogTXT, EVENTLOGSIZE, FLAC);
-			break;
 		case OUT_TYPE_MP3:
-			wcscat_s(EventLogTXT, EVENTLOGSIZE, MP3);
-			break;
 		case OUT_TYPE_WAV:
-			wcscat_s(EventLogTXT, EVENTLOGSIZE, WAV);
+			break;
+		default:
+			idx = OUT_TYPE_UNKNOWN;
 			break;
 	}
+
+	wcscat_s(EventLogTXT, EVENTLOGSIZE, OutputTypeText[idx]);
 	wcscat_s(EventLogTXT, EVENTLOGSIZE, ErrMessage[ExitCode]);
 	wcscat_s(EventLogTXT, EVENTLOGSIZE, rn);
 
-	SendMessage(progresstotal, PBM_DELTAPOS, 1, 0);						// increase the total progress bar, we have finished with the encoding even if there was an error event
+	SendMessage(progresstotal, PBM_DELTAPOS, 1, 0);
 	ReleaseSemaphore(Semaphore, 1, NULL);
-	//ExitThread(ExitCode);
 }
-

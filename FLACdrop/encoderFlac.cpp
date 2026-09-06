@@ -21,7 +21,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 	sFMTheader FMTheader;
 	sDATAheader DATAheader;
 	sClientData ClientData;
-	
+
 	// WAV: open file
 	{
 		if ((_wfopen_s(&fin, myparams->filename, L"rb")) != NULL)
@@ -393,6 +393,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 	}
 
 	myparams->ThreadInUse = false;
-	ExitEncThread(err, ghSemaphore, myparams->progresstotal, myparams->filename, OUT_TYPE_FLAC);
+	myparams->OutputType = OUT_TYPE_FLAC;
+
 	return ALL_OK;
 }

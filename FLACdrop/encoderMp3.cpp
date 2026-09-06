@@ -434,7 +434,8 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	}
 
 	myparams->ThreadInUse = false;
-	ExitEncThread(err, ghSemaphore, myparams->progresstotal, myparams->filename, OUT_TYPE_MP3);
+	myparams->OutputType = OUT_TYPE_MP3;
+
 	return ALL_OK;
 }
 
@@ -945,6 +946,7 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	}
 	
 	myparams->ThreadInUse = false;
-	ExitEncThread(err, ghSemaphore, myparams->progresstotal, myparams->filename, OUT_TYPE_MP3);
+	myparams->OutputType = OUT_TYPE_MP3;
+
 	return ALL_OK;
 }
