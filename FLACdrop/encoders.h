@@ -170,7 +170,8 @@ struct sFMTheader
 	short ValidBitsPerSample;
 	int ChannelMask;				// Speaker position mask
 	short SubFormat_AudioFormat;	// data format code
-	char SubFormat_GUID[14];
+	GUID  SubFormat_GUID;			// WAVEFORMATEXTENSIBLE SubFormat (16byte GUID)
+	int ContainerBytesPerSample;	// Container size of each sample in bytes (1, 2, 3 or 4)
 };
 
 // wave file data chunk header

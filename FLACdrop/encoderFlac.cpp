@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "FLACdrop.h"
 #include "encoders.h"
+#include "RiffParser.h"
 #include "lame.h"
 #include "libFLAC_callbacks.h"
 
@@ -27,140 +28,38 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		if ((_wfopen_s(&fin, myparams->filename, L"rb")) != NULL)
 			err = FAIL_FILE_OPEN;
 	}
-	
-	// WAV: read wav header and check if it is valid
-	if (err == ALL_OK)
-	{
-		if (fread(&WAVEheader, 1, 12, fin) != 12)
-		{
-			fclose(fin);
-			err = FAIL_FILE_OPEN;
-		}
-		if (memcmp(WAVEheader.ChunkID, "RIFF", 4) || memcmp(WAVEheader.Format, "WAVE", 4))
-		{
+
+	// Wav Analyse
+	if (err == ALL_OK) {
+		if (!ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples)) {
 			fclose(fin);
 			err = FAIL_WAV_BAD_HEADER;
 		}
 	}
 
-	// WAV: read the format chunk's header only to get its chunk size
-	if (err == ALL_OK)
-	{
-		if (fread(&DATAheader, 1, 8, fin) != 8)
-		{
-			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
-		}
-	}
-	
-	// WAV: read the complete wave file header according to its actual chunk size (16, 18 or 40 byte), ChunkSize does not include the size of the header
-	if (err == ALL_OK)
-	{
-		fseek(fin, -8, SEEK_CUR);
-		if (fread(&FMTheader, 1, (size_t)DATAheader.ChunkSize + 8, fin) != (size_t)DATAheader.ChunkSize + 8)
-		{
-			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
-		}
-	}
-
-	// WAV: check if the wav file has PCM uncompressed data
-	if (err == ALL_OK)
-	{
-		switch (FMTheader.AudioFormat)
-		{
-			case WAVE_FORMAT_PCM:
-			case WAVE_FORMAT_IEEE_FLOAT:
-				break;
-			case WAVE_FORMAT_EXTENSIBLE:
-				// in this case the first two byte of the SubFormat is defining the audio format
-				if (FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_PCM &&
-					FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_IEEE_FLOAT)
-				{
-					fclose(fin);
-					err = FAIL_WAV_UNSUPPORTED;
-				}
-				break;
-			default:
-				fclose(fin);
-				err = FAIL_WAV_UNSUPPORTED;
-		}
-	}
-
-	// WAV: determine whether the input format is PCM or IEEE float
+	// Wav Check
 	bool is_float = false;
 
-	if (err == ALL_OK)
+	if (FMTheader.AudioFormat == WAVE_FORMAT_PCM)
 	{
-		WORD fmt = FMTheader.AudioFormat;
-		WORD sub = FMTheader.SubFormat_AudioFormat;
-
-		// Check AudioFormat (PCM / FLOAT / EXTENSIBLE)
-		if (fmt == WAVE_FORMAT_PCM)
-		{
+		is_float = false;
+	}
+	else if (FMTheader.AudioFormat == WAVE_FORMAT_IEEE_FLOAT)
+	{
+		is_float = true;
+	}
+	else if (FMTheader.AudioFormat == WAVE_FORMAT_EXTENSIBLE)
+	{
+		if (FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_PCM)
 			is_float = false;
-		}
-		else if (fmt == WAVE_FORMAT_IEEE_FLOAT)
-		{
+		else if (FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_IEEE_FLOAT)
 			is_float = true;
-		}
-		else if (fmt == WAVE_FORMAT_EXTENSIBLE)
-		{
-			// EXTENSIBLE: the first two bytes of SubFormat define PCM or FLOAT
-			if (sub == WAVE_FORMAT_PCM)
-				is_float = false;
-			else if (sub == WAVE_FORMAT_IEEE_FLOAT)
-				is_float = true;
-			else
-			{
-				fclose(fin);
-				err = FAIL_WAV_UNSUPPORTED;
-			}
-		}
 		else
-		{
-			fclose(fin);
 			err = FAIL_WAV_UNSUPPORTED;
-		}
 	}
-
-	// WAV: check bit depth (PCM and FLOAT have different valid ranges)
-	if (err == ALL_OK)
+	else
 	{
-		if (!is_float)
-		{
-			// PCM: FLAC supports 16, 20, and 24-bit integer samples (20-bit is stored in 24-bit container)
-			if (FMTheader.BitsPerSample != 16 &&
-				FMTheader.BitsPerSample != 20 &&
-				FMTheader.BitsPerSample != 24)
-			{
-				fclose(fin);
-				err = FAIL_LIBFLAC_ONLY_16_24_BIT;
-			}
-		}
-		else
-		{
-			// FLOAT: allow 32-bit float and 64-bit float input
-			// (conversion to 24-bit integer will be done later)
-			if (FMTheader.BitsPerSample != 32 &&
-				FMTheader.BitsPerSample != 64)
-			{
-				fclose(fin);
-				err = FAIL_WAV_UNSUPPORTED;
-			}
-		}
-	}
-
-	// WAV: search for the data chunk
-	if (err == ALL_OK)
-	{
-		do
-		{
-			fread(&DATAheader, 1, 8, fin);
-			fseek(fin, DATAheader.ChunkSize, SEEK_CUR);
-		} while (memcmp(DATAheader.ChunkID, "data", 4));
-		fseek(fin, -DATAheader.ChunkSize, SEEK_CUR);													// go back to the beginning of the data chunk
-		total_samples = DATAheader.ChunkSize / FMTheader.NumChannels / (FMTheader.BitsPerSample / 8);	// sound data's size divided by one sample's size
+		err = FAIL_WAV_UNSUPPORTED;
 	}
 
 	// libFLAC: allocate the libFLAC encoder and data buffers
@@ -188,8 +87,13 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		unsigned flac_bps = 0;
 		if (!is_float)
 		{
-			// PCM: use original bit depth (16 or 24)
-			flac_bps = FMTheader.BitsPerSample;
+			if (FMTheader.BitsPerSample == 20){
+				// PCM: use original bit depth (16 or 24)
+				flac_bps = 24;
+			} else {
+				// PCM: use original bit depth (20)
+				flac_bps = FMTheader.BitsPerSample;
+			}
 		}
 		else
 		{
@@ -260,88 +164,93 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 	if(err == ALL_OK)
 	{
 		size_t left, need, i;
-		FLAC__byte *buffer_wav;				// READSIZE * bytes per sample * channels, we read the WAVE data into here
+		FLAC__byte *buffer_wav; 			// READSIZE * bytes per sample * channels, we read the WAVE data into here
 		FLAC__int32 *buffer_flac;			// READSIZE * channels
 		bool ok = true;
 
-		// total_samples は WAV のサンプル数
+		// total_samples は WAV のサンプル数（ParseWavFile が正しく計算済み）
 		int blocks = (total_samples + READSIZE_FLAC - 1) / READSIZE_FLAC;
 		int processed = 0;
 		int percent;
 		int last_percent = -1;
-    
+
 		// set up the progress bar boundaries and reset it
 		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
 
-		buffer_wav = new FLAC__byte[READSIZE_FLAC * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
+		// ★ コンテナのバイト数（20bit → 3byte）
+		int bytes_per_sample = FMTheader.ContainerBytesPerSample;
+
+		buffer_wav	= new FLAC__byte[READSIZE_FLAC * FMTheader.NumChannels * bytes_per_sample];
 		buffer_flac = new FLAC__int32[READSIZE_FLAC * FMTheader.NumChannels];
 
 		left = (size_t)total_samples;
+
 		while(ok && left)
 		{
-			need = (left>READSIZE_FLAC? (size_t)READSIZE_FLAC : (size_t)left);	// calculate the number of samples to read
-			if(fread(buffer_wav, (size_t)FMTheader.NumChannels * (FMTheader.BitsPerSample/8), need, fin) != need)
+			need = (left > READSIZE_FLAC ? READSIZE_FLAC : left);
+
+			if(fread(buffer_wav,
+					 (size_t)FMTheader.NumChannels * bytes_per_sample,
+					 need,
+					 fin) != need)
 			{
-				// error during reading from WAVE file
 				ok = false;
 			}
 			else
 			{
 				// convert the packed little-endian PCM samples from WAVE file into an interleaved FLAC__int32 buffer for libFLAC
-				switch(FMTheader.BitsPerSample)
+				switch(bytes_per_sample)
 				{
-					case 16:
+					case 2: // 16bit
 						for(i = 0; i < need * FMTheader.NumChannels; i++)
 						{
-							// convert the 16 bit values stored in byte array into 32 bit signed integer values
 							buffer_flac[i] = buffer_wav[2*i+1] << 8;
 							buffer_flac[i] |= buffer_wav[2*i];
-							if (buffer_flac[i] & 0x8000) buffer_flac[i] |= 0xffff0000; // correct the top 16 bit to have correct 2nd complement code
+							if (buffer_flac[i] & 0x8000) buffer_flac[i] |= 0xffff0000;
 						}
 						break;
-					case 24:
+
+					case 3: // 20bit or 24bit → 24bit として扱う
 						for(i = 0; i < need * FMTheader.NumChannels; i++)
 						{
-							// convert the 24 bit values stored in byte array into 32 bit signed integer values
 							buffer_flac[i] = buffer_wav[3*i+2] << 16;
 							buffer_flac[i] |= buffer_wav[3*i+1] << 8;
 							buffer_flac[i] |= buffer_wav[3*i];
-							if (buffer_flac[i] & 0x800000) buffer_flac[i] |= 0xff000000; // correct the top 8 bit to have correct 2nd complement code
+							if (buffer_flac[i] & 0x800000) buffer_flac[i] |= 0xff000000;
 						}
 						break;
-					case 32:
+
+					case 4: // 32bit float or 32bit int
 						if (is_float)
 						{
-							// convert 32-bit IEEE float [-1.0, +1.0] to 24-bit integer range
 							for (i = 0; i < need * FMTheader.NumChannels; i++)
 							{
 								float f;
-								memcpy(&f, buffer_wav + 4 * i, 4); // little-endian float
+								memcpy(&f, buffer_wav + 4 * i, 4);
 								double d = (double)f;
 								if (d > 1.0) d = 1.0;
 								if (d < -1.0) d = -1.0;
-								buffer_flac[i] = (FLAC__int32)(d * 8388607.0); // 0x7FFFFF
+								buffer_flac[i] = (FLAC__int32)(d * 8388607.0);
 							}
 						}
 						else
 						{
-							// convert 32-bit integer PCM → 24-bit integer (FLAC)
 							int32_t* src = (int32_t*)buffer_wav;
 							for (i = 0; i < need * FMTheader.NumChannels; i++)
 							{
-								buffer_flac[i] = src[i] >> 8;	// 上位24bitを抽出
+								buffer_flac[i] = src[i] >> 8;
 							}
 						}
 						break;
-					case 64:
+
+					case 8: // 64bit float
 						if (is_float)
 						{
-							// convert 64-bit IEEE double [-1.0, +1.0] to 24-bit integer range
 							for (i = 0; i < need * FMTheader.NumChannels; i++)
 							{
 								double d;
-								memcpy(&d, buffer_wav + 8 * i, 8); // little-endian double
+								memcpy(&d, buffer_wav + 8 * i, 8);
 								if (d > 1.0) d = 1.0;
 								if (d < -1.0) d = -1.0;
 								buffer_flac[i] = (FLAC__int32)(d * 8388607.0);
@@ -351,7 +260,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 				}
 
 				// feed samples to the encoder
-				ok = FLAC__stream_encoder_process_interleaved(encoder, buffer_flac, need);
+				ok = FLAC__stream_encoder_process_interleaved(encoder, buffer_flac, (uint32_t)need);
 
 				processed ++;
 
@@ -370,6 +279,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 #endif
 				}
 			}
+
 			left -= need;
 		}
 

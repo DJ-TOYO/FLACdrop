@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "FLACdrop.h"
 #include "encoders.h"
+#include "RiffParser.h"
 #include "lame.h"
 #include "libFLAC_callbacks.h"
 
@@ -21,7 +22,6 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	unsigned int total_samples = 0;	// can use a 32-bit number due to WAV file size limitation
 	int err = 0;
 
-
 	// WAV: open the input WAVE file
 	{
 		if ((_wfopen_s(&fin, myparams->filename, L"rb")) != NULL)
@@ -30,6 +30,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		}
 	}
 
+#if 0
 	// WAV: read wav header and check if it is valid
 	if (err == ALL_OK)
 	{
@@ -139,7 +140,32 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		fseek(fin, -DATAheader.ChunkSize, SEEK_CUR);													// go back to the beginning of the data chunk
 		total_samples = DATAheader.ChunkSize / FMTheader.NumChannels / (FMTheader.BitsPerSample / 8);	// sound data's size divided by one sample's size
 	}
-	
+#else
+	// Wav Analyse
+	if (err == ALL_OK) {
+		if (!ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples)) {
+			fclose(fin);
+			err = FAIL_WAV_BAD_HEADER;
+		}
+	}
+
+	if (FMTheader.SampleRate == 0)
+		return FAIL_WAV_BAD_HEADER;
+
+	if (FMTheader.NumChannels == 0 || FMTheader.NumChannels > 2)
+		return FAIL_WAV_BAD_HEADER;
+
+	if (FMTheader.BitsPerSample == 0)
+		return FAIL_WAV_BAD_HEADER;
+
+	if (DATAheader.ChunkSize == 0)
+		return FAIL_WAV_BAD_HEADER;
+
+	if (total_samples == 0)
+		return FAIL_WAV_BAD_HEADER;
+
+#endif
+
 	// libmp3lame: initialize lame encoder
 	if (err == ALL_OK)
 	{
@@ -238,9 +264,10 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 
 		// allocate memory buffers
-		buffer_wav_tmp = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * (FMTheader.BitsPerSample / 8)];
-		buffer_wav = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * 2];
-		buffer_mp3 = new BYTE[LAME_MAXMP3BUFFER];
+		int bytes_per_sample = FMTheader.ContainerBytesPerSample;
+		buffer_wav_tmp = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * bytes_per_sample];
+		buffer_wav     = new BYTE[READSIZE_MP3 * FMTheader.NumChannels * 2]; // 16bit 出力
+		buffer_mp3     = new BYTE[LAME_MAXMP3BUFFER];
 
 //		size_t  id3v2_size;
 //		unsigned char *id3v2tag;
@@ -274,7 +301,8 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		while (ok && left)
 		{
 			need = (left > READSIZE_MP3 ? (size_t)READSIZE_MP3 : left);	// calculate the number of samples to read
-			if (fread(buffer_wav_tmp, (size_t)FMTheader.NumChannels * (FMTheader.BitsPerSample / 8), need, fin) != need)
+
+			if (fread(buffer_wav_tmp, FMTheader.NumChannels * bytes_per_sample, need, fin) != need)
 			{
 				// error during reading from WAVE file
 				ok = false;
@@ -291,12 +319,14 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 				{
 					for (size_t i = 0; i < need * FMTheader.NumChannels; i++)
 					{
-						int32_t s20 =
+						// 3byte を 24bit 値として組み立て（リトルエンディアン）
+						int32_t s24 =
 							buffer_wav_tmp[i * 3 + 0] |
 							buffer_wav_tmp[i * 3 + 1] << 8 |
 							buffer_wav_tmp[i * 3 + 2] << 16;
 
-						((short*)buffer_wav)[i] = (short)(s20 >> 12); // 20bit → 16bit
+						// 24bit → 16bit
+						((short*)buffer_wav)[i] = (short)(s24 >> 8);
 					}
 				}
 				// 24bit → 16bit

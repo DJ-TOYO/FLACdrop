@@ -101,6 +101,9 @@
     <ClInclude Include="encoderMp3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RiffParser.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -128,6 +131,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="encoderMp3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RiffParser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
