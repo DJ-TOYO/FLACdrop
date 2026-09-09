@@ -34,17 +34,17 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 //	PURPOSE:	Collects the dropped files list and schedules the encoding threads
 //
 ENC_FUNC wavTable[] = {
-    Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
-    Encode_WAV2FLAC,   // TYPE_FLAC (this case does not occur: WAV -> FLAC is forced)
-    Encode_WAV2MP3,    // TYPE_MP3
-    Encode_WAV2FLAC    // TYPE_WAV (this case does not occur: WAV -> WAV is not meaningful, so convert to FLAC)
+	Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
+	Encode_WAV2FLAC,   // TYPE_FLAC (this case does not occur: WAV -> FLAC is forced)
+	Encode_WAV2MP3,    // TYPE_MP3
+	Encode_WAV2FLAC    // TYPE_WAV (this case does not occur: WAV -> WAV is not meaningful, so convert to FLAC)
 };
 
 ENC_FUNC flacTable[] = {
-    Encode_FLAC2WAV,   // TYPE_AUTO -> WAV
-    Encode_FLAC2MP3,   // TYPE_FLAC (this case does not occur: FLAC -> FLAC is not meaningful, so convert to MP3)
-    Encode_FLAC2MP3,   // TYPE_MP3
-    Encode_FLAC2WAV    // TYPE_WAV
+	Encode_FLAC2WAV,   // TYPE_AUTO -> WAV
+	Encode_FLAC2MP3,   // TYPE_FLAC (this case does not occur: FLAC -> FLAC is not meaningful, so convert to MP3)
+	Encode_FLAC2MP3,   // TYPE_MP3
+	Encode_FLAC2WAV    // TYPE_WAV
 };
 
 DWORD WINAPI EncoderScheduler(LPVOID params)
@@ -108,6 +108,7 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 		}
 
 		if (func) {
+			// Thread
 			tID = SearchFreeThread(EncParams);
 			EncParams[tID].ThreadInUse = true;
 			EncParams[tID].progress = myparams->progress[tID];
@@ -117,12 +118,8 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 			EncParams[tID].ExitCode = 0;
 
 			HANDLE h = CreateThread(NULL, 0,
-				EncoderFunctionExecThread,   // スレッド本体はこちら
+				EncoderFunctionExecThread,
 				&EncParams[tID], 0, NULL);
-
-//			HANDLE h = CreateThread(NULL, 0,
-//				(LPTHREAD_START_ROUTINE)func,
-//				&EncParams[tID], 0, NULL);
 
 			aThread[tID] = h;
 			waitHandles[startedThreads] = h;  // Wait/Close 用の連続配列
