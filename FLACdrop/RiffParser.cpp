@@ -18,6 +18,8 @@ static uint16_t ReadUint16LE(FILE* fp)
 	return (uint16_t)b[0] | ((uint16_t)b[1] << 8);
 }
 
+// WAV file Analysis
+// -Seeking to the Data Chunk Position
 bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheader* outData, unsigned int* outTotalSamples)
 {
 	if (!fp || !outWave || !outFmt || !outData || !outTotalSamples)
@@ -164,15 +166,15 @@ bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheade
 	// BITチェック
 	switch (outFmt->BitsPerSample)
 	{
-	case 16:
-	case 20:
-	case 24:
-	case 32:
-	case 64:
-		bitEnable = true;
-		break;
-	default:
-		return false;
+		case 16:
+		case 20:
+		case 24:
+		case 32:
+		case 64:
+			bitEnable = true;
+			break;
+		default:
+			return false;
 	}
 
 	return (fmtFound && dataFound  && FormatEnable && bitEnable);
