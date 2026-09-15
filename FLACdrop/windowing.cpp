@@ -1,7 +1,9 @@
 #include "stdafx.h"
+#include <process.h>
 #include "FLACdrop.h"
 #include "io.h"
 #include "encoders.h"
+
 
 // Global variables defined in FLACdrop.cpp
 extern sEncoderSettings EncSettings;					// Variable to store encoder settings
@@ -305,9 +307,15 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				DragFinish(hDrop);
 
 				EnableUI(hDlg, FALSE);	// disable the UI while encoding is in progress
-				CreateThread(NULL, 0,
-					(LPTHREAD_START_ROUTINE)&EncoderScheduler,
-					&UIParameters, 0, NULL);
+
+				_beginthreadex(
+					NULL,
+					0,
+					EncoderScheduler,
+					&UIParameters,
+					0,
+					NULL
+				);
 			}
 		}
 		break;
@@ -348,6 +356,7 @@ void EnableUI(HWND hDlg, BOOL bEnable)
 	EnableMenuItem(hMenu, IDM_EXIT, bEnable ? MF_ENABLED : MF_GRAYED);
 }
 
+// Command line processing function to handle files passed as arguments
 void ProcessCommandLineFiles(sUIParameters& ui)
 {
 	// Add command-line arguments to the file list
@@ -364,13 +373,15 @@ void ProcessCommandLineFiles(sUIParameters& ui)
 		ui.enOutType = TYPE_AUTO;
 
 		EnableUI(ui.hMainWnd, FALSE);
-		CreateThread(
+
+		_beginthreadex(
 			NULL,
 			0,
-			(LPTHREAD_START_ROUTINE)&EncoderScheduler,
+			EncoderScheduler,
 			&ui,
 			0,
 			NULL
 		);
+
 	}
 }

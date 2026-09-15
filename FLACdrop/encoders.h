@@ -239,5 +239,5 @@ extern TCHAR *EventLogTXT;						// variable to store event log history
 extern HANDLE ghSemaphore;						// handle for the semaphore
 
 // encoder algorithms
-DWORD WINAPI EncoderScheduler(LPVOID params);
+unsigned __stdcall EncoderScheduler(LPVOID params);
 //void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);

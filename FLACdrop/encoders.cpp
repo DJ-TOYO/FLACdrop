@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <process.h>
 #include "FLACdrop.h"
 #include "encoders.h"
 #include "lame.h"
@@ -11,7 +12,7 @@ extern sEncoderSettings EncSettings;			// variable to store encoder settings
 extern TCHAR *EventLogTXT;						// variable to store event log history
 HANDLE ghSemaphore;								// handle for the semaphore
 
-DWORD WINAPI EncoderFunctionExecThread(LPVOID p);
+unsigned __stdcall EncoderFunctionExecThread(LPVOID p);
 void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);
 
 //
@@ -29,7 +30,7 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 }
 
 //
-//	FUNCTION:	EncoderScheduler(sUIParameters* )
+//	FUNCTION:	unsigned __stdcall EncoderScheduler(sUIParameters* )
 //
 //	PURPOSE:	Collects the dropped files list and schedules the encoding threads
 //
@@ -47,7 +48,7 @@ ENC_FUNC flacTable[] = {
 	Encode_FLAC2WAV    // TYPE_WAV
 };
 
-DWORD WINAPI EncoderScheduler(LPVOID params)
+unsigned __stdcall EncoderScheduler(LPVOID params)
 {
 	UINT NumFiles;
 	static HANDLE aThread[MAX_THREADS];																// array for the thread identifiers
@@ -117,12 +118,17 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 			EncParams[tID].OutputType = OUT_TYPE_UNKNOWN;
 			EncParams[tID].ExitCode = 0;
 
-			HANDLE h = CreateThread(NULL, 0,
-				EncoderFunctionExecThread,
-				&EncParams[tID], 0, NULL);
+			uintptr_t h = _beginthreadex(
+				NULL,				 // security
+				0,					 // stack size
+				EncoderFunctionExecThread, // thread function
+				&EncParams[tID],	 // argument
+				0,					 // start immediately
+				NULL				 // thread ID (unused)
+			);
 
-			aThread[tID] = h;
-			waitHandles[startedThreads] = h;  // Wait/Close —p‚Ì˜A‘±”z—ñ
+			aThread[tID] = (HANDLE)h;
+			waitHandles[startedThreads] = (HANDLE)h;
 			startedThreads ++;
 
 			ThreadStarted = true;
@@ -164,11 +170,11 @@ DWORD WINAPI EncoderScheduler(LPVOID params)
 }
 
 //
-//	FUNCTION:	DWORD EncoderFunctionExecThread(LPVOID p)
+//	FUNCTION:	unsigned __stdcall EncoderFunctionExecThread(LPVOID p)
 //
 //	PURPOSE:	the encoder function thread run.
 //
-DWORD WINAPI EncoderFunctionExecThread(LPVOID p)
+unsigned __stdcall EncoderFunctionExecThread(LPVOID p)
 {
 	sEncodingParameters* prm = (sEncodingParameters*)p;
 
