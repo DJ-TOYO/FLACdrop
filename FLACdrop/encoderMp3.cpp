@@ -30,117 +30,6 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		}
 	}
 
-#if 0
-	// WAV: read wav header and check if it is valid
-	if (err == ALL_OK)
-	{
-		if (fread(&WAVEheader, 1, 12, fin) != 12)
-		{
-			fclose(fin);
-			err = FAIL_FILE_OPEN;
-		}
-	}
-	if (err == ALL_OK)
-	{
-		if (memcmp(WAVEheader.ChunkID, "RIFF", 4) || memcmp(WAVEheader.Format, "WAVE", 4))
-		{
-			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
-		}
-	}
-
-	// WAV: read the format chunk's header only for its chunk size
-	if (err == ALL_OK)
-	{
-		if (fread(&DATAheader, 1, 8, fin) != 8)
-		{
-			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
-		}
-	}
-
-	// WAV: read the complete wave file header according to its actual chunk size (16, 18 or 40 byte), ChunkSize does not include the size of the header
-	if (err == ALL_OK)
-	{
-		fseek(fin, -8, SEEK_CUR);
-		if (fread(&FMTheader, 1, (size_t)DATAheader.ChunkSize + 8, fin) != (size_t)DATAheader.ChunkSize + 8)
-		{
-			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
-		}
-	}
-
-	// WAV: check if the wav file has PCM uncompressed data
-	if (err == ALL_OK)
-	{
-		switch (FMTheader.AudioFormat)
-		{
-		case WAVE_FORMAT_PCM:
-		case WAVE_FORMAT_IEEE_FLOAT:
-			break;
-		case WAVE_FORMAT_EXTENSIBLE:
-			// in this case the first two byte of the SubFormat is defining the audio format
-			if (FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_PCM &&
-				FMTheader.SubFormat_AudioFormat != WAVE_FORMAT_IEEE_FLOAT)
-			{
-				fclose(fin);
-				err = FAIL_WAV_UNSUPPORTED;
-			}
-			break;
-		case WAVE_FORMAT_UNKNOWN:
-			if (FMTheader.NumChannels < 1 || FMTheader.NumChannels > 2)
-			{
-				fclose(fin);
-				err = FAIL_WAV_UNSUPPORTED;
-			}
-			else if (FMTheader.BitsPerSample != 16 &&
-				FMTheader.BitsPerSample != 20 &&
-				FMTheader.BitsPerSample != 24 &&
-				FMTheader.BitsPerSample != 32 &&
-				FMTheader.BitsPerSample != 64)
-			{
-				fclose(fin);
-				err = FAIL_WAV_UNSUPPORTED;
-			}
-			break;
-		default:
-			fclose(fin);
-			err = FAIL_WAV_UNSUPPORTED;
-			break;
-		}
-	}
-
-	// WAV: check if the WAVE file has 16 bit resolution, MP3 stream does not support 24 bit
-	if (err == ALL_OK)
-	{
-		switch (FMTheader.BitsPerSample)
-		{
-		case 16:   // そのまま
-		case 20:   // 後段で 20→16bit に変換
-		case 24:   // 後段で 24→16bit に変換
-		case 32:   // 後段で 32→16bit に変換（float / int 両方）
-		case 64:   // 後段で 64→16bit に変換（float）
-			break;
-
-		default:
-			fclose(fin);
-			err = FAIL_LAME_ONLY_16_BIT;
-			break;
-		}
-	}
-
-	// WAV: search for the data chunk
-	if (err == ALL_OK)
-	{
-		do
-		{
-			fread(&DATAheader, 1, 8, fin);
-			fseek(fin, DATAheader.ChunkSize, SEEK_CUR);
-		} while (memcmp(DATAheader.ChunkID, "data", 4));
-		fseek(fin, -DATAheader.ChunkSize, SEEK_CUR);													// go back to the beginning of the data chunk
-		total_samples = DATAheader.ChunkSize / FMTheader.NumChannels / (FMTheader.BitsPerSample / 8);	// sound data's size divided by one sample's size
-	}
-#else
 	// Wav Analyse
 	if (err == ALL_OK) {
 		if (!ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples)) {
@@ -163,8 +52,6 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 
 	if (total_samples == 0)
 		return FAIL_WAV_BAD_HEADER;
-
-#endif
 
 	// libmp3lame: initialize lame encoder
 	if (err == ALL_OK)
