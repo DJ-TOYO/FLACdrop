@@ -5,6 +5,9 @@
 #include "lame.h"
 #include "libFLAC_callbacks.h"
 
+unsigned short* make_utf16_field(const char* utf8, const char* frameId);
+unsigned short* make_utf16_text(const char* utf8);
+
 //
 //	FUNCTION:	Encode_WAV2MP3(sEncodingParameters* )
 //
@@ -460,7 +463,14 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		int vorbiscommentoffset;
 		char* commentname, * commentvalue;
 
-		for (int i = 0; i < MD_NUMBER; i++) MetaDataTrans[i].present = false; // clear the metadata transfer variables
+		for (int i = 0; i < MD_NUMBER; i++) {
+			MetaDataTrans[i].present = false; // clear the metadata transfer variables
+			MetaDataTrans[i].text = nullptr;
+			MetaDataTrans[i].data = nullptr;
+			MetaDataTrans[i].size = 0;
+			MetaDataTrans[i].present = false;
+		}
+
 		metadata_callbacks.read = read_iocallback;
 		metadata_callbacks.write = write_iocallback;
 		metadata_callbacks.tell = tell_iocallback;
@@ -547,6 +557,16 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 						}
 					}
 
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "ALBUMARTIST");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_ALBUMARTIST].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_ALBUMARTIST].present = true;
+							strcpy_s(MetaDataTrans[MD_ALBUMARTIST].text, MAXMETADATA, commentvalue);
+						}
+					}
+
 					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "DATE");
 					if (vorbiscommentoffset != -1)
 					{
@@ -606,6 +626,79 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 							strcpy_s(MetaDataTrans[MD_TRACKNUMBER].text, MAXMETADATA, commentvalue);
 						}
 					}
+
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "COMMENT");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_COMMENT].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_COMMENT].present = true;
+							strcpy_s(MetaDataTrans[MD_COMMENT].text, MAXMETADATA, commentvalue);
+						}
+					}
+
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "COMPOSER");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_COMPOSER].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_COMPOSER].present = true;
+							strcpy_s(MetaDataTrans[MD_COMPOSER].text, MAXMETADATA, commentvalue);
+						}
+					}
+
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "ENCODER");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_ENCODER].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_ENCODER].present = true;
+							strcpy_s(MetaDataTrans[MD_ENCODER].text, MAXMETADATA, commentvalue);
+						}
+					}
+
+					// TRACKTOTAL
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "TRACKTOTAL");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_TRACKTOTAL].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_TRACKTOTAL].present = true;
+							strcpy_s(MetaDataTrans[MD_TRACKTOTAL].text, MAXMETADATA, commentvalue);
+						}
+					}
+
+					// DISCTOTAL
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "DISCTOTAL");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_DISCTOTAL].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_DISCTOTAL].present = true;
+							strcpy_s(MetaDataTrans[MD_DISCTOTAL].text, MAXMETADATA, commentvalue);
+						}
+					}
+
+					// SOURCEMEDIA
+					vorbiscommentoffset = FLAC__metadata_object_vorbiscomment_find_entry_from(FLACMetaData, 0, "SOURCEMEDIA");
+					if (vorbiscommentoffset != -1) {
+						commententry = FLACMetaData->data.vorbis_comment.comments[vorbiscommentoffset];
+						if (FLAC__metadata_object_vorbiscomment_entry_to_name_value_pair(commententry, &commentname, &commentvalue)) {
+							MetaDataTrans[MD_SOURCE].text = new char[MAXMETADATA];
+							MetaDataTrans[MD_SOURCE].present = true;
+							strcpy_s(MetaDataTrans[MD_SOURCE].text, MAXMETADATA, commentvalue);
+						}
+					}
+				}
+
+				if (FLACMetaDataType == FLAC__METADATA_TYPE_PICTURE) {
+					FLAC__StreamMetadata_Picture *pic = &FLACMetaData->data.picture;
+
+					MetaDataTrans[MD_PICTURE].present = true;
+					MetaDataTrans[MD_PICTURE].data = new unsigned char[pic->data_length];
+					MetaDataTrans[MD_PICTURE].size = pic->data_length;
+
+					memcpy(MetaDataTrans[MD_PICTURE].data, pic->data, pic->data_length);
 				}
 
 				MetaDataOK = FLAC__metadata_iterator_next(FLACchainIterator);
@@ -713,42 +806,128 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	// libFLAC / libmp3lame: move the tags from the FLAC stream to the MP3 stream
 	if (err == ALL_OK)
 	{
-		size_t  id3v2_size;
-		unsigned char* id3v2tag;
-		int imp3, owrite;
-
 		// switch on ID3 v2 tags in the MP3 stream
 		id3tag_init(lame_gfp);
 		id3tag_v2_only(lame_gfp);
 
-		// add the tags
-		if (MetaDataTrans[MD_ALBUM].present == true) id3tag_set_album(lame_gfp, MetaDataTrans[MD_ALBUM].text);
-		if (MetaDataTrans[MD_ARTIST].present == true) id3tag_set_artist(lame_gfp, MetaDataTrans[MD_ARTIST].text);
-		if (MetaDataTrans[MD_DATE].present == true) id3tag_set_year(lame_gfp, MetaDataTrans[MD_DATE].text);
-		if (MetaDataTrans[MD_GENRE].present == true) id3tag_set_genre(lame_gfp, MetaDataTrans[MD_GENRE].text);
-		if (MetaDataTrans[MD_TITLE].present == true) id3tag_set_title(lame_gfp, MetaDataTrans[MD_TITLE].text);
-		if (MetaDataTrans[MD_TRACKNUMBER].present == true) id3tag_set_track(lame_gfp, MetaDataTrans[MD_TRACKNUMBER].text);
-		// http://id3.org/id3v2.3.0#Text_information_frames
-
-		id3v2_size = lame_get_id3v2_tag(lame_gfp, 0, 0);
-		id3v2tag = new unsigned char[id3v2_size];
-		if (id3v2tag != 0)
+		// UTF-16 テキストフレームを書き込むヘルパー
+		auto write_utf16 = [&](int md_index, const char* frameId)
 		{
-			imp3 = lame_get_id3v2_tag(lame_gfp, id3v2tag, id3v2_size);
-			owrite = (int)fwrite(id3v2tag, 1, imp3, fout);
-			if (owrite != imp3)
+			if (!MetaDataTrans[md_index].present)
+				return;
+
+			if (!frameId)
+				return;
+
+			unsigned short* f = make_utf16_field(MetaDataTrans[md_index].text, frameId);
+			if (!f)
+				return;
+
+			id3tag_set_fieldvalue_utf16(lame_gfp, f);
+			delete[] f;
+		};
+
+		// UTF-16 フレーム書き込み
+		write_utf16(MD_TITLE,		"TIT2");
+		write_utf16(MD_ARTIST,		"TPE1");
+		write_utf16(MD_ALBUM,		"TALB");
+		write_utf16(MD_ALBUMARTIST, "TPE2");
+		write_utf16(MD_COMPOSER,	"TCOM");
+		write_utf16(MD_GENRE,		"TCON");
+		write_utf16(MD_DATE,		"TYER");
+
+		if (MetaDataTrans[MD_TRACKNUMBER].present)
+		{
+			std::string trck = MetaDataTrans[MD_TRACKNUMBER].text;
+
+			if (MetaDataTrans[MD_TRACKTOTAL].present)
 			{
-				fclose(fin);
-				fclose(fout);
-				FLAC__stream_decoder_delete(decoder);
-				lame_close(lame_gfp);
-				err = FAIL_LAME_ID3TAG;
+				trck += "/";
+				trck += MetaDataTrans[MD_TRACKTOTAL].text;
 			}
-			if (LAME_FLUSH == true) fflush(fout);
-			delete[]id3v2tag;
+
+			unsigned short* f = make_utf16_field(trck.c_str(), "TRCK");
+			if (f)
+			{
+				id3tag_set_fieldvalue_utf16(lame_gfp, f);
+				delete[] f;
+			}
 		}
 
-		for (int i = 0; i < MD_NUMBER; i++) if (MetaDataTrans[i].present == true) delete[] MetaDataTrans[i].text;	// free up the metadata transfer block
+		if (MetaDataTrans[MD_DISCNUMBER].present)
+		{
+			std::string tpos = MetaDataTrans[MD_DISCNUMBER].text;
+
+			if (MetaDataTrans[MD_DISCTOTAL].present)
+			{
+				tpos += "/";
+				tpos += MetaDataTrans[MD_DISCTOTAL].text;
+			}
+
+			unsigned short* f = make_utf16_field(tpos.c_str(), "TPOS");
+			if (f)
+			{
+				id3tag_set_fieldvalue_utf16(lame_gfp, f);
+				delete[] f;
+			}
+		}
+
+		if (MetaDataTrans[MD_COMMENT].present)
+		{
+			unsigned short desc[] = { 0xFEFF, 0x0000 };
+			unsigned short* text = make_utf16_text(MetaDataTrans[MD_COMMENT].text);
+
+			id3tag_set_comment_utf16(
+				lame_gfp,
+				"eng",
+				desc,
+				text
+			);
+			delete[] text;
+		}
+
+		// ジャケット画像（APIC）
+		if (MetaDataTrans[MD_PICTURE].present &&
+			MetaDataTrans[MD_PICTURE].data &&
+			MetaDataTrans[MD_PICTURE].size > 0)
+		{
+			id3tag_set_albumart(lame_gfp,
+								(const char*)MetaDataTrans[MD_PICTURE].data,
+								MetaDataTrans[MD_PICTURE].size);
+		}
+
+		// LAME に ID3v2.3 タグを書き出させる
+		size_t id3v2_size = lame_get_id3v2_tag(lame_gfp, 0, 0);
+		if (id3v2_size > 0)
+		{
+			unsigned char* id3v2tag = new unsigned char[id3v2_size];
+			if (id3v2tag)
+			{
+				int imp3 = lame_get_id3v2_tag(lame_gfp, id3v2tag, id3v2_size);
+				int owrite = (int)fwrite(id3v2tag, 1, imp3, fout);
+
+				delete[] id3v2tag;
+
+				if (owrite != imp3)
+				{
+					fclose(fin);
+					fclose(fout);
+					FLAC__stream_decoder_delete(decoder);
+					lame_close(lame_gfp);
+					err = FAIL_LAME_ID3TAG;
+				}
+
+				if (LAME_FLUSH == true)
+					fflush(fout);
+			}
+		}
+
+		// FLAC メタデータの解放
+		for (int i = 0; i < MD_NUMBER; i++)
+		{
+			if (MetaDataTrans[i].present)
+				delete[] MetaDataTrans[i].text;
+		}
 	}
 
 	// libFLAC / libmp3lame: start the transcoding
@@ -866,4 +1045,59 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	myparams->OutputType = OUT_TYPE_MP3;
 
 	return ALL_OK;
+}
+
+unsigned short* make_utf16_field(const char* utf8, const char* frameId)
+{
+	if (!utf8 || !frameId) return nullptr;
+
+	// UTF-8 → UTF-16(WCHAR)
+	int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+	if (wlen <= 0) return nullptr;
+
+	WCHAR* wbuf = new WCHAR[wlen];
+	MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wbuf, wlen);
+
+	// UTF-16(WCHAR) → UCS-2(unsigned short)
+	size_t body_len = wlen - 1; // 終端除く
+	size_t total = 1 + 4 + 1 + body_len + 1;
+
+	unsigned short* out = new unsigned short[total];
+	if (!out) {
+		delete[] wbuf;
+		return nullptr;
+	}
+
+	size_t p = 0;
+
+	out[p++] = 0xFEFF; // BOM
+
+	out[p++] = (unsigned short)frameId[0];
+	out[p++] = (unsigned short)frameId[1];
+	out[p++] = (unsigned short)frameId[2];
+	out[p++] = (unsigned short)frameId[3];
+
+	out[p++] = (unsigned short)'=';
+
+	for (size_t i = 0; i < body_len; i++)
+		out[p++] = (unsigned short)wbuf[i];
+
+	out[p++] = 0x0000;
+
+	delete[] wbuf;
+	return out;
+}
+
+unsigned short* make_utf16_text(const char* utf8)
+{
+	int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, NULL, 0);
+	if (wlen <= 0) return nullptr;
+
+	// BOM + UTF-16 + 終端
+	unsigned short* out = new unsigned short[wlen + 1];
+	out[0] = 0xFEFF;  // BOM
+
+	MultiByteToWideChar(CP_UTF8, 0, utf8, -1, (LPWSTR)(out + 1), wlen);
+
+	return out;
 }

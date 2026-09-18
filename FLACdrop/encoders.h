@@ -34,23 +34,31 @@ typedef enum
 #define RADIO_BTN_TYPE_AUTO 3
 
 // positions of the metadata variables in the transfer structure
-#define MD_NUMBER		16			// number of metadata fields
+#define MD_NUMBER		24			// number of metadata fields
 #define MD_TITLE		0
 #define MD_VERSION		1
 #define MD_ALBUM		2
 #define MD_TRACKNUMBER	3
-#define MD_DISCNUMBER	4
-#define MD_ARTIST		5
-#define MD_PERFORMER	6
-#define MD_COPYRIGHT	7
-#define MD_LICENSE		8
-#define MD_ORGANIZATION	9
-#define MD_DESCRIPTION	10
-#define MD_GENRE		11
-#define MD_DATE			12
-#define MD_LOCATION		13
-#define MD_CONTACT		14
-#define MD_ISRC			15
+#define MD_TRACKTOTAL   4
+#define MD_DISCNUMBER	5
+#define MD_DISCTOTAL    6
+#define MD_ARTIST		7
+#define MD_PERFORMER	8
+#define MD_COPYRIGHT	9
+#define MD_LICENSE		10
+#define MD_ORGANIZATION	11
+#define MD_DESCRIPTION	12
+#define MD_GENRE		13
+#define MD_DATE			14
+#define MD_LOCATION		15
+#define MD_CONTACT		16
+#define MD_ISRC			17
+#define MD_ALBUMARTIST	18
+#define MD_COMMENT		19
+#define MD_COMPOSER 	20
+#define MD_ENCODER		21
+#define MD_SOURCE       22
+#define MD_PICTURE		23
 
 // default values of system variables for libflac, libmp3lame
 #define FLAC_ENCODINGQUALITY 6		// 1..8
@@ -232,6 +240,8 @@ struct sMetaData
 {
 	char *text;
 	bool present;
+	unsigned char* data;
+	int size;
 };
 
 extern sEncoderSettings EncSettings;			// variable to store encoder settings
