@@ -116,6 +116,8 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 		return FALSE;
 	}
 
+	ReadWindowPos(hWnd);
+
 	// Create the main window
 	CreateDialog(hInst, MAKEINTRESOURCE(IDD_FORMVIEW), hWnd, (DLGPROC)MainForm);
 
@@ -178,6 +180,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_DESTROY:
 			delete EventLogTXT;
 			WriteSettings();	// write settings to registry at program exit
+			WriteWindowPos(hWnd);
 			PostQuitMessage(0);
 			break;
 

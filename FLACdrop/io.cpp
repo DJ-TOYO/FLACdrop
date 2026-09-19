@@ -3,6 +3,8 @@
 
 extern sEncoderSettings EncSettings;
 
+void CenterWindowOnPrimaryMonitor(HWND hWnd);
+
 //
 //  FUNCTION: RegOut()
 //
@@ -226,3 +228,97 @@ int ReadSettings()
 	return 0;
 }
 
+// Write Window Position
+int WriteWindowPos(HWND hWnd)
+{
+	HKEY hKey;
+	DWORD err;
+
+	err = RegCreateKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\FLACdrop", 0, NULL,
+						 REG_OPTION_NON_VOLATILE, KEY_WRITE | KEY_SET_VALUE,
+						 NULL, &hKey, NULL);
+
+	if (err != ERROR_SUCCESS)
+		return FAIL_REGISTRY_OPEN;
+
+	RECT rc;
+	GetWindowRect(hWnd, &rc);
+
+	RegSetValueEx(hKey, L"WindowPosX", 0, REG_DWORD, (BYTE*)&rc.left, sizeof(DWORD));
+	RegSetValueEx(hKey, L"WindowPosY", 0, REG_DWORD, (BYTE*)&rc.top, sizeof(DWORD));
+
+	RegCloseKey(hKey);
+	return 0;
+}
+
+// Read Window Position
+int ReadWindowPos(HWND hWnd)
+{
+	HKEY hKey;
+	DWORD cb, type;
+	int xPos, yPos;
+
+	// ウィンドウの実サイズを取得
+	RECT win;
+	GetWindowRect(hWnd, &win);
+	int winWidth  = win.right  - win.left;
+	int winHeight = win.bottom - win.top;
+
+	// -----------------------------
+	// ① レジストリが無い → 画面中央
+	// -----------------------------
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\FLACdrop", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+	{
+		CenterWindowOnPrimaryMonitor(hWnd);
+		return 0;
+	}
+
+	// -----------------------------
+	// ② レジストリから位置読み込み
+	// -----------------------------
+	cb = sizeof(DWORD);
+	RegQueryValueEx(hKey, L"WindowPosX", 0, &type, (BYTE*)&xPos, &cb);
+	RegQueryValueEx(hKey, L"WindowPosY", 0, &type, (BYTE*)&yPos, &cb);
+
+	RegCloseKey(hKey);
+
+	// 仮位置に移動してモニタ判定
+	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+	// -----------------------------
+	// ③ 範囲外判定
+	// -----------------------------
+	HMONITOR hMon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONULL);
+
+	if (hMon == NULL)
+	{
+		// -----------------------------
+		// ④ 範囲外 → メインモニタ中央
+		// -----------------------------
+		CenterWindowOnPrimaryMonitor(hWnd);
+		return 0;
+	}
+
+	// -----------------------------
+	// ⑤ 範囲内 → レジストリ位置を使用
+	// -----------------------------
+	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+	return 0;
+}
+
+void CenterWindowOnPrimaryMonitor(HWND hWnd)
+{
+	RECT rcWork;
+	SystemParametersInfo(SPI_GETWORKAREA, 0, &rcWork, 0);
+
+	RECT win;
+	GetWindowRect(hWnd, &win);
+
+	int winWidth  = win.right  - win.left;
+	int winHeight = win.bottom - win.top;
+
+	int cx = rcWork.left + (rcWork.right - rcWork.left - winWidth)	/ 2;
+	int cy = rcWork.top  + (rcWork.bottom - rcWork.top - winHeight) / 2;
+
+	SetWindowPos(hWnd, NULL, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+}
