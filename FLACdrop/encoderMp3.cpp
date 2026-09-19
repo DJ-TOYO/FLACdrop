@@ -23,7 +23,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	lame_global_flags *lame_gfp;
 	FILE *fin, *fout;
 	unsigned int total_samples = 0;	// can use a 32-bit number due to WAV file size limitation
-	int err = 0;
+	int err = ALL_OK;
 
 	// WAV: open the input WAVE file
 	{
@@ -35,26 +35,29 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 
 	// Wav Analyse
 	if (err == ALL_OK) {
-		if (!ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples)) {
+		err = ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples);
+		if (err == ALL_OK) {
 			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
 		}
 	}
 
-	if (FMTheader.SampleRate == 0)
-		return FAIL_WAV_BAD_HEADER;
+	// Wav Check
+	if (err == ALL_OK) {
+		if (FMTheader.SampleRate == 0)
+			return FAIL_WAV_BAD_HEADER;
 
-	if (FMTheader.NumChannels == 0 || FMTheader.NumChannels > 2)
-		return FAIL_WAV_BAD_HEADER;
+		if (FMTheader.NumChannels == 0 || FMTheader.NumChannels > 2)
+			return FAIL_WAV_BAD_HEADER;
 
-	if (FMTheader.BitsPerSample == 0)
-		return FAIL_WAV_BAD_HEADER;
+		if (FMTheader.BitsPerSample == 0)
+			return FAIL_WAV_BAD_HEADER;
 
-	if (DATAheader.ChunkSize == 0)
-		return FAIL_WAV_BAD_HEADER;
+		if (DATAheader.ChunkSize == 0)
+			return FAIL_WAV_BAD_HEADER;
 
-	if (total_samples == 0)
-		return FAIL_WAV_BAD_HEADER;
+		if (total_samples == 0)
+			return FAIL_WAV_BAD_HEADER;
+	}
 
 	// libmp3lame: initialize lame encoder
 	if (err == ALL_OK)
@@ -356,7 +359,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_MP3;
 
-	return ALL_OK;
+	return err;
 }
 
 //
@@ -373,7 +376,7 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	FILE* fin, * fout;
 	FLAC__StreamDecoder* decoder = 0;
 	lame_global_flags* lame_gfp;
-	int err = 0;
+	int err = ALL_OK;
 
 	// libFLAC: allocate the libFLAC decoder
 	{
@@ -1044,7 +1047,7 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_MP3;
 
-	return ALL_OK;
+	return err;
 }
 
 unsigned short* make_utf16_field(const char* utf8, const char* frameId)

@@ -20,10 +20,10 @@ static uint16_t ReadUint16LE(FILE* fp)
 
 // WAV file Analysis
 // -Seeking to the Data Chunk Position
-bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheader* outData, unsigned int* outTotalSamples)
+int ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheader* outData, unsigned int* outTotalSamples)
 {
 	if (!fp || !outWave || !outFmt || !outData || !outTotalSamples)
-		return false;
+		return FAIL_FILE_OPEN;
 
 	// Init
 	memset(outWave, 0, sizeof(sWAVEheader));
@@ -35,11 +35,11 @@ bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheade
 	// RIFF / WAVE ヘッダ
 	// ---------------------------------------------------------
 	if (fread(outWave, 1, 12, fp) != 12)
-		return false;
+		return FAIL_WAV_BAD_HEADER;
 
 	if (memcmp(outWave->ChunkID, "RIFF", 4) ||
 		memcmp(outWave->Format, "WAVE", 4))
-		return false;
+		return FAIL_WAV_BAD_HEADER;
 
 	// ---------------------------------------------------------
 	// チャンク走査
@@ -129,25 +129,37 @@ bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheade
 			memcpy(outData->ChunkID, "data", 4);
 			outData->ChunkSize = (int)chunkSize;
 
-			// data チャンクの先頭へ戻す
+			// data チャンクのDATA位置(PCMデータ)に戻す。
 			fseek(fp, chunkDataPos, SEEK_SET);
 
 			// total_samples 計算
 			*outTotalSamples =
 				chunkSize / (uint32_t)outFmt->BlockAlign;
 
-			return true;
+			// data位置で終了
+			break;
 		}
 		else
 		{
 			// その他チャンクはスキップ
-			fseek(fp, chunkSize, SEEK_CUR);
+			if (fseek(fp, chunkSize, SEEK_CUR) != 0) {
+				// ファイルサイズを超えた。
+				break;
+			}
+
 		}
 
-		// パディング
-		if (chunkSize & 1)
-			fseek(fp, 1, SEEK_CUR);
+		// パディング※1BIT目が1の場合は奇数チェンクなので1byteパディングされる
+		if (chunkSize & 1) {
+			if(fseek(fp, 1, SEEK_CUR) != 0){
+				// ファイルサイズを超えた。
+				break;
+			}
+		}
 	}
+
+	if (!fmtFound || !dataFound)
+		return FAIL_WAV_BAD_HEADER;
 
 	// Format Check
 	if (outFmt->AudioFormat == WAVE_FORMAT_PCM){
@@ -161,7 +173,7 @@ bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheade
 	}
 
 	if (!FormatEnable)
-		return false;
+		return FAIL_WAV_UNSUPPORTED;
 
 	// BITチェック
 	switch (outFmt->BitsPerSample)
@@ -174,8 +186,11 @@ bool ParseWavFile(FILE* fp, sWAVEheader* outWave, sFMTheader* outFmt, sDATAheade
 			bitEnable = true;
 			break;
 		default:
-			return false;
+			return FAIL_WAV_UNSUPPORTED;
 	}
 
-	return (fmtFound && dataFound  && FormatEnable && bitEnable);
+	if (!fmtFound || !dataFound)
+		return FAIL_WAV_BAD_HEADER;
+
+	return ALL_OK;
 }

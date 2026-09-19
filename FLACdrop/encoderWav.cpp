@@ -14,8 +14,8 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 	sEncodingParameters* myparams = (sEncodingParameters*)params;
 	FLAC__StreamDecoder* decoder = 0;
 	FILE* fin, * fout;
-	int err = 0;
 	sClientData ClientData;
+	int err = ALL_OK;
 
 	// libFLAC: allocate the decoder
 	{
@@ -178,5 +178,5 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_WAV;
 
-	return ALL_OK;
+	return err;
 }

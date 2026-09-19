@@ -16,7 +16,8 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 	FLAC__StreamEncoder *encoder = NULL;
 	unsigned int total_samples = 0;		// can use a 32-bit number due to WAV file size limitations in specification
 	FILE* fin, * fout;
-	int err = 0;
+	bool is_float = false;
+	int err = ALL_OK;
 
 	sWAVEheader WAVEheader;
 	sFMTheader FMTheader;
@@ -31,35 +32,36 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 
 	// Wav Analyse
 	if (err == ALL_OK) {
-		if (!ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples)) {
+		err = ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples);
+		if (err != ALL_OK) {
 			fclose(fin);
-			err = FAIL_WAV_BAD_HEADER;
 		}
 	}
 
 	// Wav Check
-	bool is_float = false;
-
-	if (FMTheader.AudioFormat == WAVE_FORMAT_PCM)
+	if (err == ALL_OK)
 	{
-		is_float = false;
-	}
-	else if (FMTheader.AudioFormat == WAVE_FORMAT_IEEE_FLOAT)
-	{
-		is_float = true;
-	}
-	else if (FMTheader.AudioFormat == WAVE_FORMAT_EXTENSIBLE)
-	{
-		if (FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_PCM)
+		if (FMTheader.AudioFormat == WAVE_FORMAT_PCM)
+		{
 			is_float = false;
-		else if (FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_IEEE_FLOAT)
+		}
+		else if (FMTheader.AudioFormat == WAVE_FORMAT_IEEE_FLOAT)
+		{
 			is_float = true;
+		}
+		else if (FMTheader.AudioFormat == WAVE_FORMAT_EXTENSIBLE)
+		{
+			if (FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_PCM)
+				is_float = false;
+			else if (FMTheader.SubFormat_AudioFormat == WAVE_FORMAT_IEEE_FLOAT)
+				is_float = true;
+			else
+				err = FAIL_WAV_UNSUPPORTED;
+		}
 		else
+		{
 			err = FAIL_WAV_UNSUPPORTED;
-	}
-	else
-	{
-		err = FAIL_WAV_UNSUPPORTED;
+		}
 	}
 
 	// libFLAC: allocate the libFLAC encoder and data buffers
@@ -305,5 +307,5 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_FLAC;
 
-	return ALL_OK;
+	return err;
 }
