@@ -4,6 +4,7 @@
 extern sEncoderSettings EncSettings;
 
 void CenterWindowOnPrimaryMonitor(HWND hWnd);
+DWORD GetPhysicalCoreCount();
 
 // Setting Registry Reset *delete Registry
 int ResetRegistrySettings()
@@ -227,7 +228,22 @@ int ReadSettings()
 	if ((err != ERROR_SUCCESS) || (type != REG_DWORD))
 	{
 		// create the registry entry if it is missing or has a different type
-		EncSettings.OUT_Threads = OUT_THREADS;
+		// Get the number of physical CPU cores
+		DWORD cores = GetPhysicalCoreCount();
+#if 0	
+		// CPUコア数を80%に制限する
+		DWORD autoThreads = (DWORD)(cores * 0.8);
+#else
+		// CPUコア数をスレッド数に設定する
+		DWORD autoThreads = cores;
+#endif
+		// 最低は OUT_THREADS（=1）
+		if (autoThreads < OUT_THREADS) autoThreads = OUT_THREADS;
+
+		// 最大は MAX_THREADS（=16）
+		if (autoThreads > MAX_THREADS) autoThreads = MAX_THREADS;
+
+		EncSettings.OUT_Threads = autoThreads;
 		RegDeleteValue(hKey, L"OUT_Threads");
 		RegSetValueEx(hKey, L"OUT_Threads", 0, REG_DWORD, (LPBYTE)&EncSettings.OUT_Threads, sizeof(DWORD));
 	}
@@ -333,4 +349,47 @@ void CenterWindowOnPrimaryMonitor(HWND hWnd)
 	int cy = rcWork.top  + (rcWork.bottom - rcWork.top - winHeight) / 2;
 
 	SetWindowPos(hWnd, NULL, cx, cy, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+}
+
+// Get the number of physical CPU cores
+DWORD GetPhysicalCoreCount()
+{
+	DWORD len = 0;
+	// First call to get the required buffer size
+	GetLogicalProcessorInformation(NULL, &len);
+
+	SYSTEM_LOGICAL_PROCESSOR_INFORMATION* buffer =
+		(SYSTEM_LOGICAL_PROCESSOR_INFORMATION*) new char[len];
+
+	if (!buffer)
+		// Memory allocation failed
+		// CPU core count is returned as a DWORD, so we return 1 as a fallback
+		return 1;
+
+	// Second call to get the actual information
+	if (GetLogicalProcessorInformation(buffer, &len) == FALSE)
+	{
+		delete[](char*)buffer;
+		return 1;
+	}
+
+	// Calculate the number of entries in the buffer
+	DWORD physicalCores = 0;
+	int count = len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION);
+
+	// Count the number of physical cores
+	for (int i = 0; i < count; i++)
+	{
+		if (buffer[i].Relationship == RelationProcessorCore)
+			physicalCores++;
+	}
+
+	delete[](char*)buffer;
+
+	// If no physical cores were found, return 1 as a fallback
+	if (physicalCores == 0)
+		return 1;
+
+	// CPU core count is returned as a DWORD
+	return physicalCores;
 }
