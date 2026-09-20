@@ -265,7 +265,7 @@ int ReadWindowPos(HWND hWnd)
 	int winHeight = win.bottom - win.top;
 
 	// -----------------------------
-	// ① レジストリが無い → 画面中央
+	// １． レジストリが無い → 画面中央
 	// -----------------------------
 	if (RegOpenKeyEx(HKEY_CURRENT_USER, L"SOFTWARE\\FLACdrop", 0, KEY_READ, &hKey) != ERROR_SUCCESS)
 	{
@@ -274,7 +274,7 @@ int ReadWindowPos(HWND hWnd)
 	}
 
 	// -----------------------------
-	// ② レジストリから位置読み込み
+	// ２． レジストリから位置読み込み
 	// -----------------------------
 	cb = sizeof(DWORD);
 	RegQueryValueEx(hKey, L"WindowPosX", 0, &type, (BYTE*)&xPos, &cb);
@@ -286,26 +286,27 @@ int ReadWindowPos(HWND hWnd)
 	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
 	// -----------------------------
-	// ③ 範囲外判定
+	// ３． 範囲外判定
 	// -----------------------------
 	HMONITOR hMon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONULL);
 
 	if (hMon == NULL)
 	{
 		// -----------------------------
-		// ④ 範囲外 → メインモニタ中央
+		// ４． 範囲外 → メインモニタ中央
 		// -----------------------------
 		CenterWindowOnPrimaryMonitor(hWnd);
 		return 0;
 	}
 
 	// -----------------------------
-	// ⑤ 範囲内 → レジストリ位置を使用
+	// ５． 範囲内 → レジストリ位置を使用
 	// -----------------------------
 	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 	return 0;
 }
 
+// メインモニタ中央
 void CenterWindowOnPrimaryMonitor(HWND hWnd)
 {
 	RECT rcWork;
