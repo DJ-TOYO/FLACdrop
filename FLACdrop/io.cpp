@@ -5,6 +5,17 @@ extern sEncoderSettings EncSettings;
 
 void CenterWindowOnPrimaryMonitor(HWND hWnd);
 
+// Setting Registry Reset *delete Registry
+int ResetRegistrySettings()
+{
+	LONG result = RegDeleteTree(HKEY_CURRENT_USER, L"SOFTWARE\\FLACdrop");
+
+	if (result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND)
+		return 0;
+
+	return FAIL_REGISTRY_WRITE;
+}
+
 //
 //  FUNCTION: RegOut()
 //

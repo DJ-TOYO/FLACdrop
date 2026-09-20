@@ -15,6 +15,7 @@ sUIParameters GlobalEncSettings;				// variable to store global encoder settings
 TCHAR *EventLogTXT;								// variable to store event log history
 
 // Forward declarations of functions included in this code module:
+bool				ProcessCommandLine(LPTSTR lpCmdLine);
 ATOM				MyRegisterClass(HINSTANCE hInstance);
 BOOL				InitInstance(HINSTANCE, int);
 LRESULT CALLBACK	WndProc(HWND, UINT, WPARAM, LPARAM);
@@ -28,6 +29,11 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	UNREFERENCED_PARAMETER(lpCmdLine);
 	MSG msg;
 	HACCEL hAccelTable;
+
+	if (ProcessCommandLine(lpCmdLine)) {
+		// If command line processing indicates to exit (e.g., after resetting settings), exit the application
+		return 0;
+	}
 
 	// Initialize global strings
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -53,6 +59,37 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	}
 
 	return (int) msg.wParam;
+}
+
+// Function to process command line arguments
+bool ProcessCommandLine(LPTSTR lpCmdLine)
+{
+	if (!lpCmdLine) return false;
+
+	if (_tcsicmp(lpCmdLine, L"-reset") == 0 ||
+		_tcsicmp(lpCmdLine, L"/reset") == 0)
+	{
+		if (ResetRegistrySettings() == 0)
+		{
+			MessageBox(NULL,
+				L"FLACdrop ÇÃê›íËÇèâä˙âªÇµÇ‹ÇµÇΩÅB",
+				L"FLACdrop",
+				MB_OK | MB_ICONINFORMATION);
+		}
+		else
+		{
+			MessageBox(NULL,
+				L"ê›íËÇÃèâä˙âªÇ…é∏îsÇµÇ‹ÇµÇΩÅB",
+				L"FLACdrop",
+				MB_OK | MB_ICONERROR);
+		}
+
+		// Exit the application after resetting settings
+		return true;
+	}
+
+	// If there are other command line arguments, you can handle them here
+	return false;
 }
 
 //
