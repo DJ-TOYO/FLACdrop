@@ -36,9 +36,6 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	// Wav Analyse
 	if (err == ALL_OK) {
 		err = ParseWavFile(fin, &WAVEheader, &FMTheader, &DATAheader, &total_samples);
-		if (err == ALL_OK) {
-			fclose(fin);
-		}
 	}
 
 	// Wav Check
