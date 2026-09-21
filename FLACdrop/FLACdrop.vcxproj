@@ -97,6 +97,11 @@
       <AdditionalDependencies>FLAC.lib;libmp3lame.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)\libFLAC\lib\$(Platform)\$(Configuration)\;$(SolutionDir)\libmp3lame\lib\$(Platform)\$(Configuration)\</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>copy "$(SolutionDir)\libFLAC\lib\x64\Debug\FLAC.dll" "$(OutDir)"
+
+copy "$(SolutionDir)\libmp3lame\lib\x64\Debug\libmp3lame.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(Registry Setting)|x64'">
     <ClCompile>
@@ -112,6 +117,11 @@
       <AdditionalDependencies>FLAC.lib;libmp3lame.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)\libFLAC\lib\$(Platform)\Debug\;$(SolutionDir)\libmp3lame\lib\$(Platform)\Debug\</AdditionalLibraryDirectories>
     </Link>
+    <PostBuildEvent>
+      <Command>copy "$(SolutionDir)\libFLAC\lib\x64\Debug\FLAC.dll" "$(OutDir)"
+
+copy "$(SolutionDir)\libmp3lame\lib\x64\Debug\libmp3lame.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -134,6 +144,11 @@
     <ProjectReference>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
+    <PostBuildEvent>
+      <Command>copy "$(SolutionDir)\libFLAC\lib\x64\Release\FLAC.dll" "$(OutDir)"
+copy "$(SolutionDir)\libmp3lame\lib\x64\Release\libmp3lame.dll" "$(OutDir)"
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(Registry Setting)|x64'">
     <ClCompile>
@@ -156,6 +171,11 @@
     <ProjectReference>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
+    <PostBuildEvent>
+      <Command>copy "$(SolutionDir)\libFLAC\lib\x64\Release\FLAC.dll" "$(OutDir)"
+copy "$(SolutionDir)\libmp3lame\lib\x64\Release\libmp3lame.dll" "$(OutDir)"
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="FLACdrop.ico" />
