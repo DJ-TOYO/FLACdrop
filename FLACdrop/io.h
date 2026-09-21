@@ -1,5 +1,5 @@
 #pragma once
-int ResetRegistrySettings();
+int ResetSettings();
 int WriteSettings();
 int ReadSettings();
 int WriteWindowPos(HWND hWnd);

@@ -69,7 +69,8 @@ bool ProcessCommandLine(LPTSTR lpCmdLine)
 	if (_tcsicmp(lpCmdLine, L"-reset") == 0 ||
 		_tcsicmp(lpCmdLine, L"/reset") == 0)
 	{
-		if (ResetRegistrySettings() == 0)
+		// Reset settings and inform the user
+		if (ResetSettings() == 0)
 		{
 			MessageBox(NULL,
 				L"FLACdrop ‚Ìİ’è‚ğ‰Šú‰»‚µ‚Ü‚µ‚½B",

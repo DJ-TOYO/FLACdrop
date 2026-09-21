@@ -1,13 +1,172 @@
 #include "stdafx.h"
 #include "encoders.h"
+#ifdef ENABLE_INI_FILE_SETTING
+#include "IniFile.h"
+#endif
 
 extern sEncoderSettings EncSettings;
 
 void CenterWindowOnPrimaryMonitor(HWND hWnd);
 DWORD GetPhysicalCoreCount();
 
-// Setting Registry Reset *delete Registry
-int ResetRegistrySettings()
+#ifdef ENABLE_INI_FILE_SETTING
+//*** INI file Setting Mode ***
+static CIniFile g_Ini;
+
+// Reset settings and inform the user *delete Registry
+int ResetSettings()
+{
+	// INIファイル削除
+	TCHAR path[MAX_PATH];
+	GetModuleFileName(NULL, path, MAX_PATH);
+
+	CString ini = path;
+	int pos = ini.ReverseFind(_T('\\'));
+	if (pos != -1)
+		ini = ini.Left(pos + 1) + _T("FLACdrop.ini");
+	else
+		ini = _T("FLACdrop.ini");
+
+	DeleteFile(ini);
+	return 0;
+}
+
+//  PURPOSE:	Reads the settings from the ini file
+int ReadSettings()
+{
+	INT v;
+
+	// FLAC
+	g_Ini.GetPrivateProfile(_T("FLAC"), _T("Quality"), FLAC_ENCODINGQUALITY, &v);
+	EncSettings.FLAC_EncodingQuality = v;
+
+	g_Ini.GetPrivateProfile(_T("FLAC"), _T("Verify"), FLAC_VERIFY ? 1 : 0, &v);
+	EncSettings.FLAC_Verify = (v != 0);
+
+	g_Ini.GetPrivateProfile(_T("FLAC"), _T("MD5check"), FLAC_MD5CHECK ? 1 : 0, &v);
+	EncSettings.FLAC_MD5check = (v != 0);
+
+	// MP3
+	g_Ini.GetPrivateProfile(_T("MP3"), _T("Int_Quality"), LAME_INTERNALQUALITY, &v);
+	EncSettings.LAME_InternalEncodingQuality = v;
+
+	g_Ini.GetPrivateProfile(_T("MP3"), _T("CBR_Bitrate"), LAME_CBRBITRATE, &v);
+	EncSettings.LAME_CBRBitrate = v;
+
+	g_Ini.GetPrivateProfile(_T("MP3"), _T("VBR_Quality"), LAME_VBRQUALITY, &v);
+	EncSettings.LAME_VBRQuality = v;
+
+	g_Ini.GetPrivateProfile(_T("MP3"), _T("Enc_Type"), LAME_ENCTYPE, &v);
+	EncSettings.LAME_EncodingMode = v;
+
+	// OUT
+	g_Ini.GetPrivateProfile(_T("OUT"), _T("Type"), TYPE_AUTO, &v);
+	ENUM_RADIO_BTN_TYPE outType = (ENUM_RADIO_BTN_TYPE)v;
+	if (outType < TYPE_AUTO || outType > TYPE_WAV)
+		EncSettings.enOutType = TYPE_AUTO;
+	else
+		EncSettings.enOutType = outType;
+	
+	g_Ini.GetPrivateProfile(_T("OUT"), _T("Threads"), GetPhysicalCoreCount(), &v);
+	EncSettings.OUT_Threads = v;
+	if (EncSettings.OUT_Threads < 1) EncSettings.OUT_Threads = 1;
+	if (EncSettings.OUT_Threads > MAX_THREADS) EncSettings.OUT_Threads = MAX_THREADS;
+
+	return 0;
+}
+
+//  Writes the settings to the ini file
+int WriteSettings()
+{
+	// FLAC
+	g_Ini.WritePrivateProfile(_T("FLAC"), _T("Quality"), EncSettings.FLAC_EncodingQuality);
+	g_Ini.WritePrivateProfile(_T("FLAC"), _T("Verify"), EncSettings.FLAC_Verify ? 1 : 0);
+	g_Ini.WritePrivateProfile(_T("FLAC"), _T("MD5check"), EncSettings.FLAC_MD5check ? 1 : 0);
+
+	// MP3
+	g_Ini.WritePrivateProfile(_T("MP3"), _T("Int_Quality"), EncSettings.LAME_InternalEncodingQuality);
+	g_Ini.WritePrivateProfile(_T("MP3"), _T("CBR_Bitrate"), EncSettings.LAME_CBRBitrate);
+	g_Ini.WritePrivateProfile(_T("MP3"), _T("VBR_Quality"), EncSettings.LAME_VBRQuality);
+	g_Ini.WritePrivateProfile(_T("MP3"), _T("Enc_Type"), EncSettings.LAME_EncodingMode);
+
+	// OUT
+	g_Ini.WritePrivateProfile(_T("OUT"), _T("Type"),	EncSettings.enOutType);
+	g_Ini.WritePrivateProfile(_T("OUT"), _T("Threads"), EncSettings.OUT_Threads);
+
+	return 0;
+}
+
+// Write Window Position
+int WriteWindowPos(HWND hWnd)
+{
+	// INIファイルパスは CIniFile のコンストラクタで自動設定済み
+
+	RECT rc;
+	GetWindowRect(hWnd, &rc);
+
+	// レジストリ版と同じキー名で書く
+	g_Ini.WritePrivateProfile(_T("Window"), _T("PosX"), rc.left);
+	g_Ini.WritePrivateProfile(_T("Window"), _T("PosY"), rc.top);
+
+	return 0;
+}
+
+// Read Window Position
+int ReadWindowPos(HWND hWnd)
+{
+	// INIファイルパスは CIniFile のコンストラクタで自動設定済み
+	INT xPos, yPos;
+
+	// ウィンドウの実サイズを取得
+	RECT win;
+	GetWindowRect(hWnd, &win);
+	int winWidth  = win.right  - win.left;
+	int winHeight = win.bottom - win.top;
+
+	// -----------------------------
+	// １． INI が無い → 画面中央
+	// -----------------------------
+	if (!PathFileExists(g_Ini.GetIniFIle()))
+	{
+		CenterWindowOnPrimaryMonitor(hWnd);
+		return 0;
+	}
+
+	// -----------------------------
+	// ２． INI から位置読み込み
+	// -----------------------------
+	g_Ini.GetPrivateProfile(_T("Window"), _T("PosX"), win.left, &xPos);
+	g_Ini.GetPrivateProfile(_T("Window"), _T("PosY"), win.top,	&yPos);
+
+	// 仮位置に移動してモニタ判定
+	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+	// -----------------------------
+	// ３． 範囲外判定
+	// -----------------------------
+	HMONITOR hMon = MonitorFromWindow(hWnd, MONITOR_DEFAULTTONULL);
+
+	if (hMon == NULL)
+	{
+		// -----------------------------
+		// ４． 範囲外 → メインモニタ中央
+		// -----------------------------
+		CenterWindowOnPrimaryMonitor(hWnd);
+		return 0;
+	}
+
+	// -----------------------------
+	// ５． 範囲内 → INI位置を使用
+	// -----------------------------
+	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+	return 0;
+}
+
+#else	// ENABLE_INI_FILE_SETTING
+//*** Registry Setting Mode ***
+
+// Reset settings and inform the user *delete Registry
+int ResetSettings()
 {
 	LONG result = RegDeleteTree(HKEY_CURRENT_USER, L"SOFTWARE\\FLACdrop");
 
@@ -332,6 +491,7 @@ int ReadWindowPos(HWND hWnd)
 	SetWindowPos(hWnd, NULL, xPos, yPos, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 	return 0;
 }
+#endif	// ENABLE_INI_FILE_SETTING
 
 // メインモニタ中央
 void CenterWindowOnPrimaryMonitor(HWND hWnd)

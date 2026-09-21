@@ -61,7 +61,7 @@ typedef enum
 #define MD_PICTURE		23
 
 // default values of system variables for libflac, libmp3lame
-#define FLAC_ENCODINGQUALITY 6		// 1..8
+#define FLAC_ENCODINGQUALITY 8		// 1..8
 #define FLAC_MAXENCODINGQUALITY 8
 #define FLAC_VERIFY false
 #define FLAC_MD5CHECK true
