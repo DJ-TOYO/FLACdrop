@@ -1,8 +1,11 @@
 #include "stdafx.h"
+#include <atlstr.h>
 #include <process.h>
 #include "FLACdrop.h"
 #include "io.h"
 #include "encoders.h"
+#include "format.h"
+#include "lame.h"
 
 
 // Global variables defined in FLACdrop.cpp
@@ -22,9 +25,63 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	UNREFERENCED_PARAMETER(lParam);
 	switch (message)
 	{
-	case WM_INITDIALOG:
-		return (INT_PTR)TRUE;
+		case WM_INITDIALOG:
+		{
+			// FLACdrop Kai File Version
+			TCHAR szPath[MAX_PATH];
+			GetModuleFileName(NULL, szPath, MAX_PATH);
 
+			DWORD handle = 0;
+			DWORD size = GetFileVersionInfoSize(szPath, &handle);
+
+			CString verApp = _T("?.??");
+			if (size > 0) {
+				std::vector<BYTE> data(size);
+				if (GetFileVersionInfo(szPath, handle, size, data.data())) {
+					VS_FIXEDFILEINFO* pInfo = nullptr;
+					UINT len = 0;
+					if (VerQueryValue(data.data(), _T("\\"), (LPVOID*)&pInfo, &len)) {
+						int major = HIWORD(pInfo->dwFileVersionMS);
+						int minor = LOWORD(pInfo->dwFileVersionMS);
+						int patch = HIWORD(pInfo->dwFileVersionLS);
+						int build = LOWORD(pInfo->dwFileVersionLS);
+
+						if (build == 0) {
+							verApp.Format(_T("%d.%d%d"), major, minor, patch);
+						} else {
+							verApp.Format(_T("%d.%d%dÉ¿%d"), major, minor, patch, build);
+						}
+					}
+				}
+			}
+
+			// FLAC Version
+			CString verFLAC;
+			verFLAC.Format(_T("%S"), FLAC__VERSION_STRING);   // const char* Å® CString
+
+			// LAME Version
+			const char* lameVer = get_lame_version();
+			CString verLAME;
+			verLAME.Format(_T("%S"), lameVer);
+
+			// About Dialog Out String.
+			CString about;
+			about.Format(
+				_T("FLACdrop Kai Ver %s\n")
+				_T("Based on FLACdrop Ver 1.34\n\n")
+				_T("Using libraries:\n")
+				_T("- libFLAC Ver %s\n")
+				_T("- libMP3lame(SSE2) Ver %s"),
+				verApp.GetString(),
+				verFLAC.GetString(),
+				verLAME.GetString()
+			);
+
+			// Set IDC_STATIC control
+			SetDlgItemText(hDlg, IDC_STATIC, about);
+
+			return (INT_PTR)TRUE;
+		}
 	case WM_COMMAND:
 		if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
 		{
