@@ -22,11 +22,14 @@ void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *fi
 //
 int SearchFreeThread(sEncodingParameters EncParams[])
 {
-	int i = 0;
-
-	while (EncParams[i].ThreadInUse == true) i++;
-
-	return i;
+	while (1) {
+		for (int i = 0; i < MAX_THREADS; i++) {
+			if (!EncParams[i].ThreadInUse)
+				return i;
+		}
+		// 空きがないので、誰かが ReleaseSemaphore するまで待つ ※基本的にはここに来ない保険
+		WaitForSingleObject(ghSemaphore, INFINITE);
+	}
 }
 
 //
@@ -59,19 +62,25 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 	int tID = 0;																					// actual thread id
 	bool ThreadStarted;																				// was a thread started within the loop?
 	UINT startedThreads = 0;
-	HANDLE waitHandles[MAX_THREADS] = { 0 };
 
 	NumFiles = (UINT)myparams->files.size();														// get the number of files stored in the vector
+	if (NumFiles == 0){
+		return 0;   // nothing to do
+	}
+	HANDLE* waitHandles = new HANDLE[NumFiles];														// 作られた全てのスレッド数を管理する
+	for (UINT i = 0; i < NumFiles; i++){
+		waitHandles[i] = NULL;
+	}
+
 	SendMessage(myparams->progresstotal, PBM_SETPOS, 0, 0);											// reset the total progress bar
 	for (int i = 0; i<MAX_THREADS; i++) SendMessage(myparams->progress[i], PBM_SETPOS, 0, 0);		// reset each thread's progress bar
 	SendMessage(myparams->progresstotal, PBM_SETRANGE, 0, MAKELONG(0, NumFiles));					// set the total progress bar boundaries
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Converting is in progress");
 
-	// number of the semaphore is the number of threads we would like to use in parallel
-	// if the number of files are less than the number of available threads then we have to create the semaphore for the number of files
-	if (EncSettings.OUT_Threads > NumFiles) ghSemaphore = CreateSemaphore(NULL, NumFiles - 1, MAX_THREADS, NULL);
-	else ghSemaphore = CreateSemaphore(NULL, EncSettings.OUT_Threads-1, MAX_THREADS, NULL);
-	
+	// The initial count of the semaphore is (number of threads to run in parallel - 1).
+	// Since the scheduler always waits until a thread finishes, no adjustment based on the number of files is required.
+	ghSemaphore = CreateSemaphore(NULL, EncSettings.OUT_Threads - 1, MAX_THREADS, NULL);
+
 	// setup the variales
 	for (int i=0; i<MAX_THREADS; i++) EncParams[i].ThreadInUse = false;								// reset the thread status flags
 	for (int i=0; i<MAX_THREADS; i++) EncParams[i].text = myparams->text;
@@ -145,11 +154,7 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 
 	CloseHandle(ghSemaphore);
 
-	for (UINT i = 0; i < startedThreads; i++) {
-		if(waitHandles[i] != NULL) {
-			CloseHandle(waitHandles[i]);
-		}
-	}
+	delete[] waitHandles;
 
 	for (int i = 0; i < MAX_THREADS; i++) {
 		aThread[i] = NULL;
@@ -190,6 +195,8 @@ unsigned __stdcall EncoderFunctionExecThread(LPVOID p)
 				  prm->progresstotal,
 				  prm->filename,
 				  prm->OutputType);
+
+	prm->ThreadInUse = false;
 
 	return exitCode;
 }
