@@ -15,6 +15,9 @@
 // ・<description>説明</description>　※任意
 // FLACdrop.rc
 // ・CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "FLACdrop.exe.manifest"　最後尾に追加
+//
+// プロジェクトのプロパティ
+// ・リンク → マニフェスト ファイル→マニフェストの生成 いいえ に変更
 
 // Global Variables:
 HINSTANCE hInst;								// current instance
