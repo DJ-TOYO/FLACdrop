@@ -234,6 +234,9 @@ copy "$(SolutionDir)\libmp3lame\lib\x64\Release\libmp3lame.dll" "$(OutDir)"
   <ItemGroup>
     <ResourceCompile Include="FLACdrop.rc" />
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="FLACdrop.exe.manifest" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
