@@ -6,6 +6,16 @@
 
 #define MAX_LOADSTRING 100
 
+// 標準拡張機能 ComCtl32.dll V6
+// ビジュアルスタイルの有効化 ※参考
+// https://learn.microsoft.com/ja-jp/windows/win32/controls/cookbook-overview
+// 
+// FLACdrop.exe.manifest
+// ・name="会社.製品.アプリケーション名"などユニーク名ならなんでもよいらしい
+// ・<description>説明</description>　※任意
+// FLACdrop.rc
+// ・CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "FLACdrop.exe.manifest"　最後尾に追加
+
 // Global Variables:
 HINSTANCE hInst;								// current instance
 TCHAR szTitle[MAX_LOADSTRING];					// The title bar text
