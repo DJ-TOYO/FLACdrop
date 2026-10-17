@@ -1,3 +1,7 @@
+FLACdrop Kai(改) Ver1.01 2026/10/17
+・16ファイル以上の場合、正しく変換出来ない不具合を修正
+・その他、微修正
+
 FLACdrop Kai(改) Ver1.00
 
 FLACdrop KaiはWAV、FLACの相互コンバートが行えます。
