@@ -37,18 +37,18 @@ int SearchFreeThread(sEncodingParameters EncParams[])
 //
 //	PURPOSE:	Collects the dropped files list and schedules the encoding threads
 //
-ENC_FUNC wavTable[] = {
-	Encode_WAV2FLAC,   // TYPE_AUTO → FLAC
-	Encode_WAV2FLAC,   // TYPE_FLAC (this case does not occur: WAV -> FLAC is forced)
-	Encode_WAV2MP3,    // TYPE_MP3
-	Encode_WAV2FLAC    // TYPE_WAV (this case does not occur: WAV -> WAV is not meaningful, so convert to FLAC)
+const ENC_FUNC wavTable[] = {
+	Encode_WAV2FLAC,	// TYPE_AUTO → FLAC
+	Encode_WAV2FLAC,	// TYPE_FLAC (this case does not occur: WAV -> FLAC is forced)
+	Encode_WAV2MP3,		// TYPE_MP3
+	NULL,				// TYPE_WAV (this case does not occur: WAV -> WAV is not meaningful)
 };
 
-ENC_FUNC flacTable[] = {
-	Encode_FLAC2WAV,   // TYPE_AUTO -> WAV
-	Encode_FLAC2MP3,   // TYPE_FLAC (this case does not occur: FLAC -> FLAC is not meaningful, so convert to MP3)
-	Encode_FLAC2MP3,   // TYPE_MP3
-	Encode_FLAC2WAV    // TYPE_WAV
+const ENC_FUNC flacTable[] = {
+	Encode_FLAC2WAV,	// TYPE_AUTO -> WAV
+	NULL,				// TYPE_FLAC (this case does not occur: FLAC -> FLAC is not meaningful)
+	Encode_FLAC2MP3,	// TYPE_MP3
+	Encode_FLAC2WAV,	// TYPE_WAV
 };
 
 unsigned __stdcall EncoderScheduler(LPVOID params)
@@ -60,7 +60,6 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 	WCHAR Filename[MAXFILENAMELENGTH];
 	WCHAR *FilenameExt;
 	int tID = 0;																					// actual thread id
-	bool ThreadStarted;																				// was a thread started within the loop?
 	UINT startedThreads = 0;
 
 	NumFiles = (UINT)myparams->files.size();														// get the number of files stored in the vector
@@ -88,7 +87,6 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 
 	for(UINT i=0; i < NumFiles; i++)
 	{
-		ThreadStarted = false;
 		wcscpy_s(Filename, MAXFILENAMELENGTH, myparams->files[i].c_str());							// get files name
 
 		// check if the extension in the filename is WAV or FLAC and start encoder algorithm accordingly
@@ -96,19 +94,10 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 		FilenameExt = wcsrchr(Filename, ch);	// search for the last "." in the filename
 
 		// 拡張子判定
-		bool isWav = (_wcsnicmp(FilenameExt, L".wav", 4) == 0);
-		bool isFlac = (_wcsnicmp(FilenameExt, L".flac", 5) == 0);
+		bool isWav = (FilenameExt && _wcsnicmp(FilenameExt, L".wav", 4) == 0);
+		bool isFlac = (FilenameExt && _wcsnicmp(FilenameExt, L".flac", 5) == 0);
 
-		ENC_FUNC func = nullptr;
-
-		// 同じ形式なら無視する
-		if ((isWav && myparams->enOutType == TYPE_WAV) ||
-			(isFlac && myparams->enOutType == TYPE_FLAC))
-		{
-			// 進捗バーだけ進める
-			SendMessage(myparams->progresstotal, PBM_DELTAPOS, 1, 0);
-			continue;
-		}
+		ENC_FUNC func = NULL;
 
 		if (isWav) {
 			func = wavTable[myparams->enOutType];
@@ -118,7 +107,7 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 		}
 
 		if (func) {
-			// Thread
+			// Convert Thread
 			tID = SearchFreeThread(EncParams);
 			EncParams[tID].ThreadInUse = true;
 			EncParams[tID].progress = myparams->progress[tID];
@@ -140,11 +129,12 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 			waitHandles[startedThreads] = (HANDLE)h;
 			startedThreads ++;
 
-			ThreadStarted = true;
+			// a thread was started so we have to decrease the count of the semaphore with one, continue only if at least one thread is free
+			WaitForSingleObject(ghSemaphore, INFINITE);
+		} else {
+			// no thread was started (file extension was not recognized), but we still have to increase the total progress bar
+			SendMessage(myparams->progresstotal, PBM_DELTAPOS, 1, 0);
 		}
-
-		if (ThreadStarted == true) WaitForSingleObject(ghSemaphore, INFINITE);	// a thread was started so we have to decrease the count of the semaphore with one, continue only if at least one thread is free
-		else SendMessage(myparams->progresstotal, PBM_DELTAPOS, 1, 0);			// no thread was started (file extension was not recognized), but we still have to increase the total progress bar
 	}
 
 	// wait for all threads to terminate
