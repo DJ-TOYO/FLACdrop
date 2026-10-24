@@ -92,14 +92,16 @@ bool ProcessCommandLine(LPTSTR lpCmdLine)
 		if (ResetSettings() == 0)
 		{
 			MessageBox(NULL,
-				L"FLACdrop の設定を初期化しました。",
+				// L"FLACdrop の設定を初期化しました。",
+				L"FLACdrop settings have been reset.",
 				L"FLACdrop",
 				MB_OK | MB_ICONINFORMATION);
 		}
 		else
 		{
 			MessageBox(NULL,
-				L"設定の初期化に失敗しました。",
+				// L"FLACdrop の設定を初期化しました。",
+				L"Failed to reset settings.",
 				L"FLACdrop",
 				MB_OK | MB_ICONERROR);
 		}
