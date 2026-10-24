@@ -1,4 +1,5 @@
 #include "stdafx.h"
+#include <ShObjIdl.h>
 #include <atlstr.h>
 #include <process.h>
 #include "FLACdrop.h"
@@ -274,6 +275,9 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	UNREFERENCED_PARAMETER(lParam);
 
 	static sUIParameters UIParameters;
+	static ITaskbarList3* taskbarList = nullptr;
+	static HWND taskbarWindow = nullptr;
+	static UINT totalFiles = 0;
 	int result;
 	int argc = 0;
 
@@ -281,6 +285,16 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 		// initialize the dialog box
 		case WM_INITDIALOG:
+			if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER,
+				IID_PPV_ARGS(&taskbarList)))) {
+				if (FAILED(taskbarList->HrInit())) {
+					taskbarList->Release();
+					taskbarList = nullptr;
+				} else {
+					taskbarWindow = GetAncestor(hDlg, GA_ROOT);
+				}
+			}
+
 			UIParameters.MainThreadId = GetCurrentThreadId();
 			UIParameters.hMainWnd = hDlg;
 			UIParameters.EncoderInUse = false;
@@ -395,6 +409,50 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case WM_USER_ENABLE_UI:
 			EnableUI(hDlg, TRUE);
+			break;
+
+		case WM_APP_SET_TOTAL_PROGRESS:						// Initialize total and taskbar progress bars
+			totalFiles = static_cast<UINT>(wParam);
+
+			// total progress bars
+			if (totalFiles > 0) {
+				SendMessage(UIParameters.progresstotal, PBM_SETRANGE32, 0, totalFiles);
+			}
+			SendMessage(UIParameters.progresstotal, PBM_SETPOS, 0, 0);
+
+			// taskbar progress bars
+			if (taskbarList != NULL && totalFiles > 0) {
+				if(totalFiles > 0) {
+					taskbarList->SetProgressState(taskbarWindow, TBPF_NORMAL);
+					taskbarList->SetProgressValue(taskbarWindow, 0, totalFiles);
+				} else {
+					taskbarList->SetProgressState(taskbarWindow, TBPF_NOPROGRESS);
+				}
+			}
+			break;
+
+		case WM_APP_INCREMENT_TOTAL_PROGRESS:				// // Increment total and taskbar progress bars
+		{
+			// total progress bars
+			SendMessage(UIParameters.progresstotal, PBM_DELTAPOS, 1, 0);
+			LRESULT position = SendMessage(UIParameters.progresstotal, PBM_GETPOS, 0, 0);
+
+			// taskbar progress bars
+			if (taskbarList && totalFiles > 0) {
+				if (static_cast<UINT>(position) >= totalFiles) {
+					taskbarList->SetProgressState(taskbarWindow, TBPF_NOPROGRESS);
+				} else {
+					taskbarList->SetProgressValue(taskbarWindow, position, totalFiles);
+				}
+			}
+			break;
+		}
+
+		case WM_DESTROY:
+			if (taskbarList) {
+				taskbarList->Release();
+				taskbarList = nullptr;
+			}
 			break;
 	}
 	return (INT_PTR)FALSE;

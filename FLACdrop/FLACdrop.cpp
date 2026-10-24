@@ -3,6 +3,7 @@
 #include "windowing.h"
 #include "encoders.h"
 #include "io.h"
+#include <objbase.h>
 
 #define MAX_LOADSTRING 100
 
@@ -48,6 +49,9 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		return 0;
 	}
 
+	HRESULT comResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+	bool comInitialized = SUCCEEDED(comResult);
+
 	// Initialize global strings
 	LoadString(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadString(hInstance, IDC_FLACDROP, szWindowClass, MAX_LOADSTRING);
@@ -56,6 +60,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 	// Perform application initialization:
 	if (!InitInstance (hInstance, nCmdShow))
 	{
+		if (comInitialized) CoUninitialize();
 		return FALSE;
 	}
 
@@ -71,6 +76,7 @@ int APIENTRY _tWinMain(HINSTANCE hInstance,
 		}
 	}
 
+	if (comInitialized) CoUninitialize();
 	return (int) msg.wParam;
 }
 

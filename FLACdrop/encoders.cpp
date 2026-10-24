@@ -15,6 +15,18 @@ HANDLE ghSemaphore;								// handle for the semaphore
 unsigned __stdcall EncoderFunctionExecThread(LPVOID p);
 void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);
 
+// Initialize total and taskbar progress bars
+void InitializeTotalProgress(HWND progressTotal, UINT total)
+{
+	SendMessage(GetParent(progressTotal), WM_APP_SET_TOTAL_PROGRESS, total, 0);
+}
+
+// Increment total and taskbar progress bars
+void IncrementTotalProgress(HWND progressTotal)
+{
+	SendMessage(GetParent(progressTotal), WM_APP_INCREMENT_TOTAL_PROGRESS, 0, 0);
+}
+
 //
 //	FUNCTION: SearchFreeThread()
 //
@@ -71,9 +83,8 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 		waitHandles[i] = NULL;
 	}
 
-	SendMessage(myparams->progresstotal, PBM_SETPOS, 0, 0);											// reset the total progress bar
+	InitializeTotalProgress(myparams->progresstotal, NumFiles);											// reset the total progress bar
 	for (int i = 0; i<MAX_THREADS; i++) SendMessage(myparams->progress[i], PBM_SETPOS, 0, 0);		// reset each thread's progress bar
-	SendMessage(myparams->progresstotal, PBM_SETRANGE, 0, MAKELONG(0, NumFiles));					// set the total progress bar boundaries
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Converting is in progress");
 
 	// The initial count of the semaphore is (number of threads to run in parallel - 1).
@@ -133,7 +144,7 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 			WaitForSingleObject(ghSemaphore, INFINITE);
 		} else {
 			// no thread was started (file extension was not recognized), but we still have to increase the total progress bar
-			SendMessage(myparams->progresstotal, PBM_DELTAPOS, 1, 0);
+			IncrementTotalProgress(myparams->progresstotal);
 		}
 	}
 
@@ -226,6 +237,6 @@ void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *fi
 	wcscat_s(EventLogTXT, EVENTLOGSIZE, ErrMessage[ExitCode]);
 	wcscat_s(EventLogTXT, EVENTLOGSIZE, rn);
 
-	SendMessage(progresstotal, PBM_DELTAPOS, 1, 0);
+	IncrementTotalProgress(progresstotal);
 	ReleaseSemaphore(Semaphore, 1, NULL);
 }

@@ -250,4 +250,6 @@ extern HANDLE ghSemaphore;						// handle for the semaphore
 
 // encoder algorithms
 unsigned __stdcall EncoderScheduler(LPVOID params);
+void InitializeTotalProgress(HWND progressTotal, UINT total);
+void IncrementTotalProgress(HWND progressTotal);
 //void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);
