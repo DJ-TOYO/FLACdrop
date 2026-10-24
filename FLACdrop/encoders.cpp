@@ -95,9 +95,11 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 	for (int i=0; i<MAX_THREADS; i++) EncParams[i].ThreadInUse = false;								// reset the thread status flags
 	for (int i=0; i<MAX_THREADS; i++) EncParams[i].text = myparams->text;
 	for (int i=0; i<MAX_THREADS; i++) EncParams[i].progresstotal = myparams->progresstotal;
+	for (int i=0; i<MAX_THREADS; i++) EncParams[i].cancelRequested = &myparams->CancelRequested;
 
 	for(UINT i=0; i < NumFiles; i++)
 	{
+		if (EncParams[0].IsCancellationRequested()) break;
 		wcscpy_s(Filename, MAXFILENAMELENGTH, myparams->files[i].c_str());							// get files name
 
 		// check if the extension in the filename is WAV or FLAC and start encoder algorithm accordingly
@@ -120,6 +122,7 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 		if (func) {
 			// Convert Thread
 			tID = SearchFreeThread(EncParams);
+			if (EncParams[0].IsCancellationRequested()) break;
 			EncParams[tID].ThreadInUse = true;
 			EncParams[tID].progress = myparams->progress[tID];
 			wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
@@ -149,9 +152,12 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 	}
 
 	// wait for all threads to terminate
-	WaitForMultipleObjects(startedThreads, waitHandles, TRUE, INFINITE);
+	if (startedThreads > 0) {
+		WaitForMultipleObjects(startedThreads, waitHandles, TRUE, INFINITE);
+		for (UINT i = 0; i < startedThreads; ++i) CloseHandle(waitHandles[i]);
+	}
 
-	myparams->EncoderInUse = false;
+	InterlockedExchange(&myparams->EncoderInUse, FALSE);
 
 	CloseHandle(ghSemaphore);
 

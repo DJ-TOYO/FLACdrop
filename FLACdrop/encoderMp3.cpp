@@ -24,6 +24,9 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 	FILE *fin, *fout;
 	unsigned int total_samples = 0;	// can use a 32-bit number due to WAV file size limitation
 	int err = ALL_OK;
+	WCHAR outputFileName[MAXFILENAMELENGTH] = {};
+		bool outputFileOpened = false;
+	bool conversionCancelled = false;
 
 	// WAV: open the input WAVE file
 	{
@@ -131,10 +134,15 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		OutFileName = new WCHAR[MAXFILENAMELENGTH];
 		wcsncpy_s(OutFileName, MAXFILENAMELENGTH, myparams->filename, wcsnlen(myparams->filename, MAXFILENAMELENGTH) - 3);	// leave out the "wav" from the end
 		wcscat_s(OutFileName, MAXFILENAMELENGTH, L"mp3");
-		if ((_wfopen_s(&fout, OutFileName, L"w+b")) != NULL)
+		wcscpy_s(outputFileName, MAXFILENAMELENGTH, OutFileName);
+		if (_wfopen_s(&fout, outputFileName, L"w+b") != 0)
 		{
 			fclose(fin);
 			err = FAIL_FILE_OPEN;
+		}
+		else
+		{
+			outputFileOpened = true;
 		}
 		delete[]OutFileName;
 	}
@@ -188,7 +196,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 
 		left = (size_t)total_samples;
 		// read blocks of samples from WAVE file and feed to the encoder
-		while (ok && left)
+		while (ok && left && !myparams->IsCancellationRequested())
 		{
 			need = (left > READSIZE_MP3 ? (size_t)READSIZE_MP3 : left);	// calculate the number of samples to read
 
@@ -316,16 +324,17 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 			}
 			left -= need;
 		}
+		conversionCancelled = ok && left > 0 && myparams->IsCancellationRequested();
 
 		// may return one more mp3 frame
-		if (ok == true)
+		if (ok == true && !conversionCancelled)
 		{
 			if (LAME_NOGAP == true) imp3 = lame_encode_flush_nogap(lame_gfp, buffer_mp3, LAME_MAXMP3BUFFER);
 			else imp3 = lame_encode_flush(lame_gfp, buffer_mp3, LAME_MAXMP3BUFFER);
 			if (imp3 < 0) ok = false;
 		}
 
-		if (ok == true)
+		if (ok == true && !conversionCancelled)
 		{
 			owrite = (int)fwrite(buffer_mp3, 1, imp3, fout);
 			if (owrite != imp3) ok = false;
@@ -337,7 +346,14 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		delete[]buffer_wav;
 		delete[]buffer_mp3;
 
-		if (ok == false)
+		if (conversionCancelled)
+		{
+			fclose(fin);
+			fclose(fout);
+			lame_close(lame_gfp);
+			err = FAIL_CANCELLED;
+		}
+		else if (ok == false)
 		{
 			fclose(fin);
 			fclose(fout);
@@ -353,6 +369,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		fclose(fout);
 	}
 
+	myparams->FinalizeOutputFile(outputFileName, outputFileOpened, conversionCancelled, &err);
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_MP3;
 
@@ -374,6 +391,9 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 	FLAC__StreamDecoder* decoder = 0;
 	lame_global_flags* lame_gfp;
 	int err = ALL_OK;
+	WCHAR outputFileName[MAXFILENAMELENGTH] = {};
+		bool outputFileOpened = false;
+	bool conversionCancelled = false;
 
 	// libFLAC: allocate the libFLAC decoder
 	{
@@ -793,12 +813,17 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		OutFileName = new WCHAR[MAXFILENAMELENGTH];
 		wcsncpy_s(OutFileName, MAXFILENAMELENGTH, myparams->filename, wcsnlen(myparams->filename, MAXFILENAMELENGTH) - 4);	// leave out the "flac" from the end
 		wcscat_s(OutFileName, MAXFILENAMELENGTH, L"mp3");
-		if ((_wfopen_s(&fout, OutFileName, L"w+b")) != NULL)
+		wcscpy_s(outputFileName, MAXFILENAMELENGTH, OutFileName);
+		if (_wfopen_s(&fout, outputFileName, L"w+b") != 0)
 		{
 			fclose(fin);
 			FLAC__stream_decoder_delete(decoder);
 			lame_close(lame_gfp);
 			err = FAIL_FILE_OPEN;
+		}
+		else
+		{
+			outputFileOpened = true;
 		}
 		delete[]OutFileName;
 	}
@@ -950,6 +975,10 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		// loop the libFLAC decoder until it reaches the end of the input file or returns an error
 		do
 		{
+			if (myparams->IsCancellationRequested()) {
+				conversionCancelled = true;
+				break;
+			}
 			ok = FLAC__stream_decoder_process_single(decoder);
 			state = FLAC__stream_decoder_get_state(decoder);
 
@@ -974,18 +1003,18 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 			}
 
 			SendMessage(myparams->progress, PBM_DELTAPOS, 1, 0);	// increase the progress bar
-		} while ((state != FLAC__STREAM_DECODER_END_OF_STREAM && FLAC__STREAM_DECODER_SEEK_ERROR && FLAC__STREAM_DECODER_ABORTED && FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR) && ok == TRUE);
-
+		} while (!myparams->IsCancellationRequested() && (state != FLAC__STREAM_DECODER_END_OF_STREAM && FLAC__STREAM_DECODER_SEEK_ERROR && FLAC__STREAM_DECODER_ABORTED && FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR) && ok == TRUE);
+		conversionCancelled = myparams->IsCancellationRequested() && state != FLAC__STREAM_DECODER_END_OF_STREAM;
 
 		// may return one more mp3 frame
-		if (ok)
+		if (ok && !conversionCancelled)
 		{
 			if (LAME_NOGAP == true) imp3 = lame_encode_flush_nogap(lame_gfp, buffer_mp3, LAME_MAXMP3BUFFER);
 			else imp3 = lame_encode_flush(lame_gfp, buffer_mp3, LAME_MAXMP3BUFFER);
 			if (imp3 < 0) ok = false;
 		}
 
-		if (ok)
+		if (ok && !conversionCancelled)
 		{
 			owrite = (int)fwrite(buffer_mp3, 1, imp3, fout);
 			if (owrite != imp3) ok = false;
@@ -996,7 +1025,16 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		delete[]buffer_raw;
 		delete[]buffer_mp3;
 
-		if (ok == false)
+		if (conversionCancelled)
+		{
+			FLAC__stream_decoder_finish(decoder);
+			fclose(fin);
+			fclose(fout);
+			FLAC__stream_decoder_delete(decoder);
+			lame_close(lame_gfp);
+			err = FAIL_CANCELLED;
+		}
+		else if (ok == false)
 		{
 			fclose(fin);
 			fclose(fout);
@@ -1041,6 +1079,7 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		fclose(fout);
 	}
 	
+	myparams->FinalizeOutputFile(outputFileName, outputFileOpened, conversionCancelled, &err);
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_MP3;
 

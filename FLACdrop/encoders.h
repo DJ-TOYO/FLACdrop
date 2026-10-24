@@ -114,6 +114,8 @@ const int LAME_CBRBITRATES[] = {
 #define FAIL_LAME_ID3TAG			18
 #define FAIL_LAME_ENCODE			19
 #define FAIL_LAME_CLOSE				20
+#define FAIL_CANCELLED				21
+#define FAIL_CANCEL_CLEANUP			22
 
 // failure messages for failure codes
 const WCHAR ErrMessage[][60] = {
@@ -137,7 +139,9 @@ const WCHAR ErrMessage[][60] = {
 	L"libmp3lame: Error during initialization\r\n",				//17
 	L"libmp3lame: Error during writing ID3TAG\r\n",				//18
 	L"libmp3lame: Error during encoding\r\n",					//19
-	L"libmp3lame: Error during closing\r\n"};					//20
+	L"libmp3lame: Error during closing\r\n",				//20
+	L"Encoding cancelled by user\r\n",				//21
+	L"Failed to remove temporary output file\r\n"};	//22
 
 // global encoder settings
 struct sEncoderSettings
@@ -218,13 +222,32 @@ struct sEncodingParameters
 	HWND text;							// handle for the static text
 	ENC_FUNC func;						// encoder function
 	DWORD ExitCode; 					// last exit code of this thread *Result
+	volatile LONG* cancelRequested;
+	// 共有されたキャンセル要求の有無を確認する。
+	bool IsCancellationRequested() const
+	{
+		return cancelRequested != nullptr && InterlockedCompareExchange(cancelRequested, 0, 0) != 0;
+	}
+	// 出力結果に応じて、キャンセルまたは失敗した出力ファイルを削除する。
+	void FinalizeOutputFile(const WCHAR* outputPath, bool opened, bool cancelled, int* result)
+	{
+		if (!opened) return;
+
+		if (cancelled) *result = FAIL_CANCELLED;
+		if (cancelled || (*result != ALL_OK && *result != WARN_LIBFLAC_MD5)) {
+			if (!DeleteFileW(outputPath) && GetLastError() != ERROR_FILE_NOT_FOUND)
+				*result = FAIL_CANCEL_CLEANUP;
+		}
+	}
 	int OutputType; 					// OUT_TYPE_FLAC / MP3 / WAV     *Result
 };
 
 // structure for EncoderScheduler parameters
 struct sUIParameters
 {
-	bool EncoderInUse;			// is the encoding thread running?
+	volatile LONG EncoderInUse;	// is the encoding thread running?
+	volatile LONG CancelRequested;
+	BOOL CloseWhenDone;
 	ENUM_RADIO_BTN_TYPE enOutType;	// which output file type to use (UI)
 	std::vector<std::wstring> files;
 	BOOL bCommandLineMode;
@@ -252,4 +275,5 @@ extern HANDLE ghSemaphore;						// handle for the semaphore
 unsigned __stdcall EncoderScheduler(LPVOID params);
 void InitializeTotalProgress(HWND progressTotal, UINT total);
 void IncrementTotalProgress(HWND progressTotal);
+
 //void ExitEncThread(int ExitCode, HANDLE Semaphore, HWND progresstotal, WCHAR *filename, int type);

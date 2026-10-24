@@ -18,6 +18,9 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 	FILE* fin, * fout;
 	bool is_float = false;
 	int err = ALL_OK;
+	WCHAR outputFileName[MAXFILENAMELENGTH] = {};
+	bool outputFileOpened = false;
+	bool conversionCancelled = false;
 
 	sWAVEheader WAVEheader;
 	sFMTheader FMTheader;
@@ -142,13 +145,15 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		OutFileName = new WCHAR[MAXFILENAMELENGTH];
 		wcsncpy_s(OutFileName, MAXFILENAMELENGTH, myparams->filename, wcsnlen(myparams->filename, MAXFILENAMELENGTH)-3);	// leave out the "wav" from the end
 		wcscat_s(OutFileName, MAXFILENAMELENGTH, L"flac");
-		if ((_wfopen_s(&fout, OutFileName, L"w+b")) != NULL)
+		wcscpy_s(outputFileName, MAXFILENAMELENGTH, OutFileName);
+		if (_wfopen_s(&fout, outputFileName, L"w+b") != 0)
 		{
 			fclose(fin);
 			err = FAIL_FILE_OPEN;
 		}
 		else
 		{
+			outputFileOpened = true;
 			ClientData.fout = fout;
 			if (FLAC__stream_encoder_init_stream(encoder, write_callback_2FLAC, seek_callback_2FLAC, tell_callback_2FLAC, metadata_callback_2FLAC, &ClientData))
 			{
@@ -188,7 +193,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 
 		left = (size_t)total_samples;
 
-		while(ok && left)
+		while(ok && left && !myparams->IsCancellationRequested())
 		{
 			need = (left > READSIZE_FLAC ? READSIZE_FLAC : left);
 
@@ -284,16 +289,25 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 
 			left -= need;
 		}
+		conversionCancelled = myparams->IsCancellationRequested() && left > 0;
 
 		delete[]buffer_wav;
 		delete[]buffer_flac;
 
-		// 100%
-		SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
+		if (!myparams->IsCancellationRequested())
+			SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
 	}
 
 	// libFLAC: close the encoder
-	if (err == ALL_OK)
+	if (conversionCancelled && outputFileOpened)
+	{
+		FLAC__stream_encoder_finish(encoder);
+		fclose(fin);
+		fclose(fout);
+		FLAC__stream_encoder_delete(encoder);
+		err = FAIL_CANCELLED;
+	}
+	else if (err == ALL_OK)
 	{
 		if (FLAC__stream_encoder_finish(encoder) == false) err = FAIL_LIBFLAC_RELEASE;
 		// now that encoding is finished, the metadata can be freed
@@ -304,6 +318,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		FLAC__stream_encoder_delete(encoder);
 	}
 
+	myparams->FinalizeOutputFile(outputFileName, outputFileOpened, conversionCancelled, &err);
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_FLAC;
 

@@ -297,7 +297,9 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 			UIParameters.MainThreadId = GetCurrentThreadId();
 			UIParameters.hMainWnd = hDlg;
-			UIParameters.EncoderInUse = false;
+			UIParameters.EncoderInUse = FALSE;
+			UIParameters.CancelRequested = FALSE;
+			UIParameters.CloseWhenDone = FALSE;
 			UIParameters.bCommandLineMode = FALSE;
 			UIParameters.progress[0] = GetDlgItem(hDlg, IDC_PROGRESS0);
 			UIParameters.progress[1] = GetDlgItem(hDlg, IDC_PROGRESS1);
@@ -357,14 +359,15 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		// process the dropped files
 		case WM_DROPFILES:
 		{
-			if (!UIParameters.EncoderInUse)
+			HDROP hDrop = (HDROP)wParam;
+			if (InterlockedCompareExchange(&UIParameters.EncoderInUse, 0, 0) == 0 && !UIParameters.CloseWhenDone)
 			{
-				UIParameters.EncoderInUse = true;
+				InterlockedExchange(&UIParameters.CancelRequested, FALSE);
+				UIParameters.CloseWhenDone = FALSE;
+				InterlockedExchange(&UIParameters.EncoderInUse, TRUE);
 				UIParameters.bCommandLineMode = FALSE;
 
 				// Get Drop file
-				HDROP hDrop = (HDROP)wParam;
-
 				UINT count = DragQueryFile(hDrop, 0xFFFFFFFF, NULL, 0);
 				UIParameters.files.clear();
 				UIParameters.files.reserve(count);
@@ -387,6 +390,8 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 					0,
 					NULL
 				);
+			} else {
+				DragFinish(hDrop);
 			}
 		}
 		break;
@@ -409,7 +414,18 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case WM_USER_ENABLE_UI:
 			EnableUI(hDlg, TRUE);
+			if (UIParameters.CloseWhenDone) DestroyWindow(GetParent(hDlg));
 			break;
+
+		case WM_APP_REQUEST_CLOSE:
+			if (InterlockedCompareExchange(&UIParameters.EncoderInUse, 0, 0) == 0) {
+				DestroyWindow(GetParent(hDlg));
+			} else if (InterlockedCompareExchange(&UIParameters.CancelRequested, 0, 0) == 0 &&
+				MessageBoxW(hDlg, L"Cancel?", L"FLACdrop", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES) {
+				UIParameters.CloseWhenDone = TRUE;
+				InterlockedExchange(&UIParameters.CancelRequested, TRUE);
+			}
+			return (INT_PTR)TRUE;
 
 		case WM_APP_SET_TOTAL_PROGRESS:						// Initialize total and taskbar progress bars
 			totalFiles = static_cast<UINT>(wParam);
@@ -483,7 +499,9 @@ void ProcessCommandLineFiles(sUIParameters& ui)
 
 	// If command-line files were provided, start encoding immediately
 	if (!ui.files.empty()) {
-		ui.EncoderInUse = true;
+		InterlockedExchange(&ui.CancelRequested, FALSE);
+		ui.CloseWhenDone = FALSE;
+		InterlockedExchange(&ui.EncoderInUse, TRUE);
 		ui.bCommandLineMode = TRUE;
 		ui.enOutType = TYPE_AUTO;
 

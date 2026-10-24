@@ -16,6 +16,9 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 	FILE* fin, * fout;
 	sClientData ClientData;
 	int err = ALL_OK;
+	WCHAR outputFileName[MAXFILENAMELENGTH] = {};
+		bool outputFileOpened = false;
+	bool conversionCancelled = false;
 
 	// libFLAC: allocate the decoder
 	{
@@ -97,13 +100,18 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 		OutFileName = new WCHAR[MAXFILENAMELENGTH];
 		wcsncpy_s(OutFileName, MAXFILENAMELENGTH, myparams->filename, wcsnlen(myparams->filename, MAXFILENAMELENGTH) - 4);	// leave out the "flac" from the end
 		wcscat_s(OutFileName, MAXFILENAMELENGTH, L"wav");
-		if ((_wfopen_s(&fout, OutFileName, L"w+b")) != NULL)
+		wcscpy_s(outputFileName, MAXFILENAMELENGTH, OutFileName);
+		if (_wfopen_s(&fout, outputFileName, L"w+b") != 0)
 		{
 			fclose(fin);
 			FLAC__stream_decoder_delete(decoder);
 			err = FAIL_FILE_OPEN;
 		}
-		ClientData.fout = fout;
+		else
+		{
+			outputFileOpened = true;
+			ClientData.fout = fout;
+		}
 
 		delete[]OutFileName;
 	}
@@ -126,6 +134,10 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 		// loop the decoder until it reaches the end of the input file or returns an error
 		do
 		{
+			if (myparams->IsCancellationRequested()) {
+				conversionCancelled = true;
+				break;
+			}
 			ok = FLAC__stream_decoder_process_single(decoder);
 			state = FLAC__stream_decoder_get_state(decoder);
 
@@ -144,14 +156,23 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 			// count up
 			processed ++;
 
-		} while ((state != FLAC__STREAM_DECODER_END_OF_STREAM && FLAC__STREAM_DECODER_SEEK_ERROR && FLAC__STREAM_DECODER_ABORTED && FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR) && ok == TRUE);
+		} while (!myparams->IsCancellationRequested() && (state != FLAC__STREAM_DECODER_END_OF_STREAM && FLAC__STREAM_DECODER_SEEK_ERROR && FLAC__STREAM_DECODER_ABORTED && FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR) && ok == TRUE);
+		conversionCancelled = myparams->IsCancellationRequested() && state != FLAC__STREAM_DECODER_END_OF_STREAM;
 
-		// 100%
-		SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
+		if (!conversionCancelled)
+			SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
 	}
 
 	// libFLAC: close the decoder
-	if (err == ALL_OK)
+	if (conversionCancelled && outputFileOpened)
+	{
+		FLAC__stream_decoder_finish(decoder);
+		fclose(fout);
+		fclose(fin);
+		FLAC__stream_decoder_delete(decoder);
+		err = FAIL_CANCELLED;
+	}
+	else if (err == ALL_OK)
 	{
 		switch (FLAC__stream_decoder_get_state(decoder))
 		{
@@ -175,6 +196,7 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 		FLAC__stream_decoder_delete(decoder);
 	}
 
+	myparams->FinalizeOutputFile(outputFileName, outputFileOpened, conversionCancelled, &err);
 	myparams->ThreadInUse = false;
 	myparams->OutputType = OUT_TYPE_WAV;
 
