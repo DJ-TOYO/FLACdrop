@@ -158,7 +158,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 		int last_percent = -1;
 
 		// set up the progress bar boundaries
-		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
+		myparams->SetProgressPercent(0);
 		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
 
 		// allocate memory buffers
@@ -312,7 +312,7 @@ DWORD WINAPI Encode_WAV2MP3(LPVOID params)
 				if (percent != last_percent)
 				{
 					last_percent = percent;
-					SendMessage(myparams->progress, PBM_SETPOS, percent, 0);
+					myparams->SetProgressPercent(percent);
 #if _DEBUG
 					WCHAR dbg[128];
 					swprintf_s(dbg, L"WAV2MP3 percent = %d / %d (processed=%u, total=%u)\n",
@@ -962,6 +962,9 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		BYTE *buffer_mp3, *buffer_raw;
 		FLAC__bool ok = TRUE;
 		FLAC__StreamDecoderState state;
+		FLAC__uint64 totalBlocks = (ClientData.total_samples + ClientData.blocksize - 1) / ClientData.blocksize;
+		FLAC__uint64 processedBlocks = 0;
+		int lastPercent = -1;
 
 		// allocate memory buffers
 		buffer_raw = new BYTE[SIZE_RAW_BUFFER];
@@ -969,8 +972,8 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 		ClientData.buffer_out = buffer_raw;
 
 		// set up the progress bar boundaries, block size is around 4k depending on resolution
-		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
-		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, ClientData.total_samples / ClientData.blocksize));	
+		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
+		myparams->SetProgressPercent(0);
 
 		// loop the libFLAC decoder until it reaches the end of the input file or returns an error
 		do
@@ -981,6 +984,13 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 			}
 			ok = FLAC__stream_decoder_process_single(decoder);
 			state = FLAC__stream_decoder_get_state(decoder);
+			++processedBlocks;
+			int percent = totalBlocks > 0 ? static_cast<int>((processedBlocks * 100) / totalBlocks) : 100;
+			if (percent > 100) percent = 100;
+			if (percent != lastPercent) {
+				lastPercent = percent;
+				myparams->SetProgressPercent(percent);
+			}
 
 			// feed the block of samples to the encoder
 			switch (ClientData.channels)
@@ -1002,9 +1012,9 @@ DWORD WINAPI Encode_FLAC2MP3(LPVOID params)
 				if (LAME_FLUSH == true) fflush(fout);
 			}
 
-			SendMessage(myparams->progress, PBM_DELTAPOS, 1, 0);	// increase the progress bar
 		} while (!myparams->IsCancellationRequested() && (state != FLAC__STREAM_DECODER_END_OF_STREAM && FLAC__STREAM_DECODER_SEEK_ERROR && FLAC__STREAM_DECODER_ABORTED && FLAC__STREAM_DECODER_MEMORY_ALLOCATION_ERROR) && ok == TRUE);
 		conversionCancelled = myparams->IsCancellationRequested() && state != FLAC__STREAM_DECODER_END_OF_STREAM;
+		if (!conversionCancelled) myparams->SetProgressPercent(100);
 
 		// may return one more mp3 frame
 		if (ok && !conversionCancelled)

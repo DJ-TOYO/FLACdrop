@@ -129,7 +129,7 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 
 		// set up the progress bar boundaries, block size is around 4k depending on resolution
 		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
-		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
+		myparams->SetProgressPercent(0);
 
 		// loop the decoder until it reaches the end of the input file or returns an error
 		do
@@ -144,7 +144,7 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 			percent = (processed * 100) / blocks;
 			if (percent != last_percent) {
 				last_percent = percent;
-				SendMessage(myparams->progress, PBM_SETPOS, percent, 0);
+				myparams->SetProgressPercent(percent);
 #if _DEBUG
 				WCHAR dbg[128];
 				swprintf_s(dbg, L"FLAC2WAV percent = %d / %d (processed=%d, blocks=%d)\n",
@@ -160,7 +160,7 @@ DWORD WINAPI Encode_FLAC2WAV(LPVOID params)
 		conversionCancelled = myparams->IsCancellationRequested() && state != FLAC__STREAM_DECODER_END_OF_STREAM;
 
 		if (!conversionCancelled)
-			SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
+			myparams->SetProgressPercent(100);
 	}
 
 	// libFLAC: close the decoder

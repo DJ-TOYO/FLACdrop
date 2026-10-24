@@ -1,4 +1,6 @@
 #pragma once
+
+#define WM_APP_PROGRESS_PERCENT (WM_APP + 4)
 #include <vector>
 #include <string>
 
@@ -227,6 +229,13 @@ struct sEncodingParameters
 	bool IsCancellationRequested() const
 	{
 		return cancelRequested != nullptr && InterlockedCompareExchange(cancelRequested, 0, 0) != 0;
+	}
+	void SetProgressPercent(int percent) const
+	{
+		if (percent < 0) percent = 0;
+		if (percent > 100) percent = 100;
+		SendMessage(progress, PBM_SETPOS, percent, 0);
+		SendMessage(progress, WM_APP_PROGRESS_PERCENT, percent, 0);
 	}
 	// 出力結果に応じて、キャンセルまたは失敗した出力ファイルを削除する。
 	void FinalizeOutputFile(const WCHAR* outputPath, bool opened, bool cancelled, int* result)

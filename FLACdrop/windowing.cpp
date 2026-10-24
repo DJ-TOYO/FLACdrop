@@ -267,6 +267,57 @@ INT_PTR CALLBACK EventLog(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 //
 //	FUNCTION:	MainForm(HWND, UINT, WPARAM, LPARAM)
+static LRESULT CALLBACK ProgressPercentSubclassProc(HWND progress, UINT message, WPARAM wParam, LPARAM lParam,
+	UINT_PTR subclassId, DWORD_PTR refData)
+{
+	if (message == WM_APP_PROGRESS_PERCENT) {
+		SetWindowSubclass(progress, ProgressPercentSubclassProc, subclassId, static_cast<DWORD_PTR>(static_cast<LONG_PTR>(wParam)));
+		InvalidateRect(progress, nullptr, FALSE);
+		return 0;
+	}
+
+	LRESULT result = DefSubclassProc(progress, message, wParam, lParam);
+	if (message == WM_PAINT && static_cast<LONG_PTR>(refData) >= 0 && static_cast<LONG_PTR>(refData) <= 100) {
+		HDC dc = GetDC(progress);
+		if (dc != nullptr) {
+			RECT rect;
+			GetClientRect(progress, &rect);
+			WCHAR text[8];
+			swprintf_s(text, L"%d%%", static_cast<int>(refData));
+			HFONT font = reinterpret_cast<HFONT>(SendMessage(progress, WM_GETFONT, 0, 0));
+			HGDIOBJ oldFont = font ? SelectObject(dc, font) : nullptr;
+			int oldBkMode = SetBkMode(dc, TRANSPARENT);
+			PBRANGE range = {};
+			SendMessage(progress, PBM_GETRANGE, TRUE, reinterpret_cast<LPARAM>(&range));
+			LRESULT position = SendMessage(progress, PBM_GETPOS, 0, 0);
+			int width = rect.right - rect.left;
+			int filledWidth = range.iHigh > range.iLow
+				? static_cast<int>((static_cast<LONGLONG>(position - range.iLow) * width) / (range.iHigh - range.iLow))
+				: 0;
+			if (filledWidth < 0) filledWidth = 0;
+			if (filledWidth > width) filledWidth = width;
+
+			SetTextColor(dc, RGB(0, 0, 0));
+			DrawTextW(dc, text, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+			int savedDc = SaveDC(dc);
+			IntersectClipRect(dc, rect.left, rect.top, rect.left + filledWidth, rect.bottom);
+			SetTextColor(dc, RGB(255, 255, 255));
+			DrawTextW(dc, text, -1, &rect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+			RestoreDC(dc, savedDc);
+			SetBkMode(dc, oldBkMode);
+			if (oldFont) SelectObject(dc, oldFont);
+			ReleaseDC(progress, dc);
+		}
+	}
+	if (message == WM_NCDESTROY) RemoveWindowSubclass(progress, ProgressPercentSubclassProc, subclassId);
+	return result;
+}
+
+static void InitializeProgressPercent(HWND progress)
+{
+	SetWindowSubclass(progress, ProgressPercentSubclassProc, 1, static_cast<DWORD_PTR>(static_cast<LONG_PTR>(-1)));
+}
+
 //
 //	PURPOSE:	Handle the "drag and drop" audio files and pass them to the encoder scheduler
 //
@@ -278,6 +329,7 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	static ITaskbarList3* taskbarList = nullptr;
 	static HWND taskbarWindow = nullptr;
 	static UINT totalFiles = 0;
+	static UINT completedFiles = 0;
 	int result;
 	int argc = 0;
 
@@ -317,7 +369,10 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			UIParameters.progress[13] = GetDlgItem(hDlg, IDC_PROGRESS13);
 			UIParameters.progress[14] = GetDlgItem(hDlg, IDC_PROGRESS14);
 			UIParameters.progress[15] = GetDlgItem(hDlg, IDC_PROGRESS15);
+			for (int i = 0; i < MAX_THREADS; ++i)
+				InitializeProgressPercent(UIParameters.progress[i]);
 			UIParameters.progresstotal = GetDlgItem(hDlg, IDC_PROGRESSTOTAL);
+			InitializeProgressPercent(UIParameters.progresstotal);
 			UIParameters.text = GetDlgItem(hDlg, IDC_MESSAGES);
 			SendMessage(UIParameters.text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
 			
@@ -429,12 +484,12 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 
 		case WM_APP_SET_TOTAL_PROGRESS:						// Initialize total and taskbar progress bars
 			totalFiles = static_cast<UINT>(wParam);
+			completedFiles = 0;
 
 			// total progress bars
-			if (totalFiles > 0) {
-				SendMessage(UIParameters.progresstotal, PBM_SETRANGE32, 0, totalFiles);
-			}
+			SendMessage(UIParameters.progresstotal, PBM_SETRANGE32, 0, 100);
 			SendMessage(UIParameters.progresstotal, PBM_SETPOS, 0, 0);
+			SendMessage(UIParameters.progresstotal, WM_APP_PROGRESS_PERCENT, 0, 0);
 
 			// taskbar progress bars
 			if (taskbarList != NULL && totalFiles > 0) {
@@ -450,8 +505,12 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_APP_INCREMENT_TOTAL_PROGRESS:				// // Increment total and taskbar progress bars
 		{
 			// total progress bars
-			SendMessage(UIParameters.progresstotal, PBM_DELTAPOS, 1, 0);
-			LRESULT position = SendMessage(UIParameters.progresstotal, PBM_GETPOS, 0, 0);
+			++completedFiles;
+			UINT percent = totalFiles > 0 ? static_cast<UINT>((static_cast<ULONGLONG>(completedFiles) * 100) / totalFiles) : 0;
+			if (percent > 100) percent = 100;
+			SendMessage(UIParameters.progresstotal, PBM_SETPOS, percent, 0);
+			SendMessage(UIParameters.progresstotal, WM_APP_PROGRESS_PERCENT, percent, 0);
+			LRESULT position = completedFiles;
 
 			// taskbar progress bars
 			if (taskbarList && totalFiles > 0) {

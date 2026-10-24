@@ -84,7 +84,11 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 	}
 
 	InitializeTotalProgress(myparams->progresstotal, NumFiles);											// reset the total progress bar
-	for (int i = 0; i<MAX_THREADS; i++) SendMessage(myparams->progress[i], PBM_SETPOS, 0, 0);		// reset each thread's progress bar
+	for (int i = 0; i<MAX_THREADS; i++) {
+		SendMessage(myparams->progress[i], PBM_SETRANGE, 0, MAKELONG(0, 100));
+		SendMessage(myparams->progress[i], PBM_SETPOS, 0, 0);
+		SendMessage(myparams->progress[i], WM_APP_PROGRESS_PERCENT, -1, 0);
+	}		// reset each thread's progress bar
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Converting is in progress");
 
 	// The initial count of the semaphore is (number of threads to run in parallel - 1).
@@ -125,6 +129,7 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 			if (EncParams[0].IsCancellationRequested()) break;
 			EncParams[tID].ThreadInUse = true;
 			EncParams[tID].progress = myparams->progress[tID];
+			EncParams[tID].SetProgressPercent(0);
 			wcscpy_s(EncParams[tID].filename, MAXFILENAMELENGTH, Filename);
 			EncParams[tID].func = func;
 			EncParams[tID].OutputType = OUT_TYPE_UNKNOWN;

@@ -183,7 +183,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 
 		// set up the progress bar boundaries and reset it
 		SendMessage(myparams->progress, PBM_SETRANGE, 0, MAKELONG(0, 100));
-		SendMessage(myparams->progress, PBM_SETPOS, 0, 0);
+		myparams->SetProgressPercent(0);
 
 		// ★ コンテナのバイト数（20bit → 3byte）
 		int bytes_per_sample = FMTheader.ContainerBytesPerSample;
@@ -277,7 +277,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 				if (percent != last_percent)
 				{
 					last_percent = percent;
-					SendMessage(myparams->progress, PBM_SETPOS, percent, 0);
+					myparams->SetProgressPercent(percent);
 #if _DEBUG
 					WCHAR dbg[128];
 					swprintf_s(dbg, L"WAV2FLAC percent = %d / %d (processed=%d, blocks=%d)\n",
@@ -295,7 +295,7 @@ DWORD WINAPI Encode_WAV2FLAC(LPVOID params)
 		delete[]buffer_flac;
 
 		if (!myparams->IsCancellationRequested())
-			SendMessage(myparams->progress, PBM_SETPOS, 100, 0);
+			myparams->SetProgressPercent(100);
 	}
 
 	// libFLAC: close the encoder
