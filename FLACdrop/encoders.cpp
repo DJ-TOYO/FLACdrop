@@ -90,6 +90,7 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 		SendMessage(myparams->progress[i], WM_APP_PROGRESS_PERCENT, -1, 0);
 	}		// reset each thread's progress bar
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Converting is in progress");
+	SendMessage(myparams->hMainWnd, WM_APP_START_CONVERSION, 0, 0);
 
 	// The initial count of the semaphore is (number of threads to run in parallel - 1).
 	// Since the scheduler always waits until a thread finishes, no adjustment based on the number of files is required.
@@ -171,6 +172,8 @@ unsigned __stdcall EncoderScheduler(LPVOID params)
 	for (int i = 0; i < MAX_THREADS; i++) {
 		aThread[i] = NULL;
 	}
+
+	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
 
 	SendMessage(myparams->text, WM_SETTEXT, 0, (LPARAM)L"Waiting for audio files to be dropped...");
 

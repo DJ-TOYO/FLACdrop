@@ -318,6 +318,18 @@ static void InitializeProgressPercent(HWND progress)
 	SetWindowSubclass(progress, ProgressPercentSubclassProc, 1, static_cast<DWORD_PTR>(static_cast<LONG_PTR>(-1)));
 }
 
+static const UINT_PTR ELAPSED_TIME_TIMER_ID = 1;
+
+static void UpdateElapsedTime(HWND dialog, ULONGLONG startTick)
+{
+	ULONGLONG elapsedSeconds = (GetTickCount64() - startTick) / 1000;
+	WCHAR text[64];
+	swprintf_s(text, L"Overall progress: %02llu:%02llu:%02llu",
+		elapsedSeconds / 3600, (elapsedSeconds / 60) % 60, elapsedSeconds % 60);
+
+	SetDlgItemTextW(dialog, IDC_OVERALL_PROGRESS, text);
+}
+
 //
 //	PURPOSE:	Handle the "drag and drop" audio files and pass them to the encoder scheduler
 //
@@ -330,6 +342,8 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 	static HWND taskbarWindow = nullptr;
 	static UINT totalFiles = 0;
 	static UINT completedFiles = 0;
+	static ULONGLONG conversionStartTick = 0;
+	static bool elapsedTimeTimerActive = false;
 	int result;
 	int argc = 0;
 
@@ -467,7 +481,25 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			}
 			break;
 
+		case WM_APP_START_CONVERSION:
+			conversionStartTick = GetTickCount64();
+			UpdateElapsedTime(hDlg, conversionStartTick);
+			elapsedTimeTimerActive = SetTimer(hDlg, ELAPSED_TIME_TIMER_ID, 1000, nullptr) != 0;
+			if (!elapsedTimeTimerActive)
+				SetDlgItemTextW(hDlg, IDC_OVERALL_PROGRESS, L"Overall progress: unavailable");
+			return (INT_PTR)TRUE;
+
+		case WM_TIMER:
+			if (wParam == ELAPSED_TIME_TIMER_ID && elapsedTimeTimerActive)
+				UpdateElapsedTime(hDlg, conversionStartTick);
+			return (INT_PTR)TRUE;
+
 		case WM_USER_ENABLE_UI:
+			if (elapsedTimeTimerActive) {
+				KillTimer(hDlg, ELAPSED_TIME_TIMER_ID);
+				UpdateElapsedTime(hDlg, conversionStartTick);
+				elapsedTimeTimerActive = false;
+			}
 			EnableUI(hDlg, TRUE);
 			if (UIParameters.CloseWhenDone) DestroyWindow(GetParent(hDlg));
 			break;
@@ -524,6 +556,10 @@ INT_PTR CALLBACK MainForm(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 
 		case WM_DESTROY:
+			if (elapsedTimeTimerActive) {
+				KillTimer(hDlg, ELAPSED_TIME_TIMER_ID);
+				elapsedTimeTimerActive = false;
+			}
 			if (taskbarList) {
 				taskbarList->Release();
 				taskbarList = nullptr;
